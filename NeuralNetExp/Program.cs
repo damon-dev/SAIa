@@ -6,6 +6,10 @@ namespace NeuralNetExp
     {
         static void Main(string[] args)
         {
+            // train
+            var gAlg = new GeneticAlgorithm();
+
+            // test
         }
     }
 }
