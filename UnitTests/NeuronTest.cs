@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NeuralNetExp;
 
@@ -15,15 +16,50 @@ namespace UnitTests
             Assert.IsNotNull(neuron.Identifier);
             Assert.IsNotNull(neuron.Dendrites);
             Assert.IsNotNull(neuron.Synapses);
-            Assert.AreEqual(1, neuron.Axon);
+            Assert.AreEqual(1, neuron.Axon); // has to be this way to facilitate bias nodes
         }
 
         [TestMethod]
         public void SynapseCreation()
         {
-            var neuron = new Neuron(Guid.NewGuid());
+            var origin = new Neuron(Guid.NewGuid()); 
+            var target = new Neuron(Guid.NewGuid());
 
-            // TODO continue here
+            target.CreateSynapse(origin, 0.2);
+
+            Assert.IsTrue(origin.Synapses.Exists(t => t.Equals(target)));
+            Assert.IsTrue(target.Dendrites.ContainsKey(origin));
+            Assert.AreEqual(target.Dendrites[origin], 0.2);
+
+            target.CreateSynapse(origin, -0.4);
+
+            Assert.AreEqual(target.Dendrites[origin], -0.4);
+        }
+
+        [TestMethod]
+        public void Activation()
+        {
+            var origins = new List<Neuron>();
+            var target = new Neuron(Guid.NewGuid());
+
+            for (int i = 0; i < 10; ++i)
+            {
+                origins.Add(new Neuron(Guid.NewGuid()));
+                target.CreateSynapse(origins[i], 0.1 * ((i % 2)*2 - 1));
+            }
+
+            Assert.IsFalse(target.Fire());
+            Assert.AreEqual(0, target.Axon);
+
+            target.Dendrites[origins[0]] += 0.1;
+
+            Assert.IsTrue(target.Fire());
+            Assert.AreEqual(0.1, target.Axon);
+
+            target.Dendrites[origins[0]] -= 0.2;
+
+            Assert.IsFalse(target.Fire());
+            Assert.AreEqual(0, target.Axon);
         }
     }
 }
