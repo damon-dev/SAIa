@@ -8,7 +8,7 @@ namespace NeuralNetExp
         public Guid Identifier { get; private set; }
         public Dictionary<Neuron, double> Dendrites { get; set; }
         public List<Neuron> Synapses { get; set; }
-        public double Axon { get; set; }
+        public double Axon { get; set; } = 1;
 
         public Neuron(Guid guid)
         {

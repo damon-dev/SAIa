@@ -5,13 +5,23 @@ namespace NeuralNetExp
 {
     public class GeneticAlgorithm
     {
-        public List<Gene> Run(int generations)
+        public List<double[]> Input { get; set; }
+        public List<double> ExpectedOutput { get; set; }
+
+        public List<Gene> Run(int generations, List<double[]> input, List<double> expectedOutput)
         {
             var rand = new Random();
+            Input = input;
+            ExpectedOutput = expectedOutput;
 
             // generate population
             var population = new Population(rand);
-            population.GeneratePopulation(1, 1);
+            population.GeneratePopulation(2, 1);
+
+            for (int i = 0; i < population.Folk.Count; ++i)
+            {
+                population.Folk[i].EvaluateFitness(input, expectedOutput);
+            }
 
             int kidPerPair = 3;
             int batchSize = 3 * kidPerPair;
@@ -39,11 +49,12 @@ namespace NeuralNetExp
 
                     child.Generation = Math.Max(parent1.Generation, parent2.Generation) + 1;
 
-                    batch[i] = child;
+                    if (child.GeneGuids.Count > 0)
+                        batch[i] = child;
                 }
 
                 for (int i = 0; i < batch.Length; ++i)
-                    batch[i].EvaluateFitness();
+                    batch[i].EvaluateFitness(input, expectedOutput);
 
                 population.AddKids(batch);
             }
@@ -107,11 +118,6 @@ namespace NeuralNetExp
             }
 
             for (int i = 0; i < Size; ++i)
-            {
-                array[i].EvaluateFitness();
-            }
-
-            for (int i = 0; i < Size; ++i)
                 Folk.Add(array[i]);
         }
 
@@ -156,7 +162,7 @@ namespace NeuralNetExp
         public List<Gene> Genes { get; private set; }
         public List<Guid> GeneGuids { get; private set; }
         public int Generation { get; set; } = 0;
-        public double FitnessValue { get; private set; }
+        public double FitnessValue { get; private set; } // the greated the better
 
         public Chromosome(Random _rand, List<Guid> initialGuids, List<Gene> initialStructure)
         {
@@ -166,9 +172,18 @@ namespace NeuralNetExp
             Genes = new List<Gene>(initialStructure);
         }
 
-        public void EvaluateFitness()
+        public void EvaluateFitness(List<double[]> input, List<double> expectedOutput)
         {
-            // TODO
+            double squareSum = 0;
+            for (int i = 0; i < input.Count; ++i)
+            {
+                var cluster = new Cluster(Genes);
+                double predictedOutput = cluster.Querry(new List<double> { input[i][0], input[i][1] });
+                squareSum = (predictedOutput - expectedOutput[i]) * (predictedOutput - expectedOutput[i]);
+            }
+
+            if (squareSum == 0) FitnessValue = double.PositiveInfinity;
+            else FitnessValue = input.Count / squareSum;
         }
 
         public void Mutate()
@@ -177,7 +192,6 @@ namespace NeuralNetExp
             if (ShouldMutate())
             {
                 int index = rand.Next(0, Genes.Count);
-
                 Genes.RemoveAt(index);
             }
 
@@ -190,7 +204,10 @@ namespace NeuralNetExp
                 while (i < Genes.Count)
                 {
                     if (Genes[i].Source == GeneGuids[index] || Genes[i].Destination == GeneGuids[index])
-                        Genes.RemoveAt(i);
+                    {
+                        if (Genes.Count > 0)
+                            Genes.RemoveAt(i);
+                    }
                     else
                         i++;
                 }
@@ -249,16 +266,19 @@ namespace NeuralNetExp
                     }
                 }
 
-                int candidateIndex = rand.Next(0, candidates.Count);
+                if (candidates.Count > 0)
+                {
+                    int candidateIndex = rand.Next(0, candidates.Count);
 
-                Genes.Add((GeneGuids[index], candidates[candidateIndex], rand.NextDouble() * 2 - 1)); // random value between -1 and 1
+                    Genes.Add((GeneGuids[index], candidates[candidateIndex], rand.NextDouble() * 2 - 1)); // random value between -1 and 1
+                }
             }
         }
 
         private bool ShouldMutate()
         {
             double chance = (double)rand.Next(0, 1000) / 1000;
-            return chance < MutationRate;
+            return chance < MutationRate && GeneGuids.Count > 0 && Genes.Count > 0;
         }
 
         public static Chromosome CrossOver(Chromosome mother, Chromosome father, int similarityType, Random rand)
@@ -323,7 +343,7 @@ namespace NeuralNetExp
                     baby = new Chromosome(rand, mother.GeneGuids, commonStructure);
 
                     int b = 0;
-                    for(m = 0; m < mother.Genes.Count; ++m)
+                    for(m = 0; m < mother.Genes.Count && b < baby.Genes.Count; ++m)
                     {
                         var X = mother.Genes[m];
                         var B = baby.Genes[b];
@@ -354,11 +374,11 @@ namespace NeuralNetExp
 
                     return baby;
 
-                case 3: // more like father
+                case 2: // more like father
                     baby = new Chromosome(rand, father.GeneGuids, commonStructure);
 
                     b = 0;
-                    for (f = 0; f < father.Genes.Count; ++f)
+                    for (f = 0; f < father.Genes.Count && b < baby.Genes.Count; ++f)
                     {
                         var Y = father.Genes[f];
                         var B = baby.Genes[b];

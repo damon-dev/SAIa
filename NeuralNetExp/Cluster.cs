@@ -21,15 +21,38 @@ namespace NeuralNetExp
             var labels = new HashSet<int>();
 
             Neurons = new Dictionary<Guid, Neuron>();
+
+            GenerateFromStructure();
+        }
+
+        public double Querry(List<double> inputs)
+        {
+            // this is hacked improve later
+
+            for (int i = 0; i < inputs.Count && i < Neurons[InputGuid].Synapses.Count; ++i)
+            {
+                var inputNeuron = Neurons[InputGuid].Synapses[i];
+
+                inputNeuron.Dendrites[Neurons[InputGuid]] = inputs[i];
+            }
+
+            Propagate();
+
+            Neuron outputNeuron = null;
+            foreach (var key in Neurons[OutputGuid].Dendrites.Keys)
+            {
+                outputNeuron = key;
+                break;
+            }
+            if (outputNeuron == null) return 0;
+
+            return outputNeuron.Axon;
         }
 
         private void GenerateFromStructure()
         {
             // Adding the input
-            Neurons.Add(InputGuid, new Neuron(InputGuid)
-            {
-                Axon = 1 // Axon is 1 such that when multiplied with the dendrites that represent the input it wont change the outcome.
-            });
+            Neurons.Add(InputGuid, new Neuron(InputGuid));
 
             // Adding the output
             Neurons.Add(OutputGuid, new Neuron(OutputGuid));

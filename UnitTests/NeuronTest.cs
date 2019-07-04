@@ -15,7 +15,7 @@ namespace UnitTests
             Assert.IsNotNull(neuron.Identifier);
             Assert.IsNotNull(neuron.Dendrites);
             Assert.IsNotNull(neuron.Synapses);
-            Assert.AreEqual(0, neuron.Axon);
+            Assert.AreEqual(1, neuron.Axon);
         }
 
         [TestMethod]
