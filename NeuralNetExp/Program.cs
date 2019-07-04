@@ -45,6 +45,7 @@ namespace NeuralNetExp
             var bestStructure = gAlg.Run(runs, inputTrain, outputTrain);
 
             Console.WriteLine($"Ready!");
+            var champ = new Cluster(bestStructure);
 
             do
             {
@@ -53,7 +54,6 @@ namespace NeuralNetExp
                 int a = int.Parse(inpsp[0]);
                 int b = int.Parse(inpsp[1]);
 
-                var champ = new Cluster(bestStructure);
                 double result = champ.Querry(new List<double> { a, b });
                 Console.WriteLine(result);
             }

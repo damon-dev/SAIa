@@ -175,9 +175,10 @@ namespace NeuralNetExp
         public void EvaluateFitness(List<double[]> input, List<double> expectedOutput)
         {
             double squareSum = 0;
+            var cluster = new Cluster(Genes);
+
             for (int i = 0; i < input.Count; ++i)
             {
-                var cluster = new Cluster(Genes);
                 double predictedOutput = cluster.Querry(new List<double> { input[i][0], input[i][1] });
                 squareSum = (predictedOutput - expectedOutput[i]) * (predictedOutput - expectedOutput[i]);
             }
