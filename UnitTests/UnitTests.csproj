@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NeuralNetExp\NeuralNetExp.csproj" />
+    <ProjectReference Include="..\NeuralNetExp\EvolutionalNeuralNetwork.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NeuralNetExp
+namespace EvolutionalNeuralNetwork
 {
     /// <summary>
     /// Describes a edge with its weight in the graph.

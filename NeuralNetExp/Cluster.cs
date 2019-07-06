@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace NeuralNetExp
+namespace EvolutionalNeuralNetwork
 {
     // Neuron 0 is the neuron containing the input in the axon
     // Neuron 1 is the neuron containing the output in the dendrites
@@ -16,7 +16,7 @@ namespace NeuralNetExp
 
         public Cluster(List<Gene> structure)
         {
-            Structure = structure;
+            Structure = new List<Gene>(structure);
 
             var labels = new HashSet<int>();
 

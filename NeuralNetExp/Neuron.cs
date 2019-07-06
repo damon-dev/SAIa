@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace NeuralNetExp
+namespace EvolutionalNeuralNetwork
 {
     public class Neuron
     {

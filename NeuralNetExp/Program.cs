@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace NeuralNetExp
+namespace EvolutionalNeuralNetwork
 {
     class Program
     {
@@ -39,7 +39,7 @@ namespace NeuralNetExp
             }
 
             // train
-            var gAlg = new GeneticAlgorithm();
+            var gAlg = new Environment();
 
             int runs = 50000;
             var bestStructure = gAlg.Run(runs, inputTrain, outputTrain);
