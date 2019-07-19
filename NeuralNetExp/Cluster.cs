@@ -3,105 +3,196 @@ using System.Collections.Generic;
 
 namespace EvolutionalNeuralNetwork
 {
-    // Neuron 0 is the neuron containing the input in the axon
-    // Neuron 1 is the neuron containing the output in the dendrites
     public class Cluster
     {
         public static readonly Guid InputGuid = new Guid("8478a94f-5a4a-4d6c-a3f8-16b7fb4ad2c6");
         public static readonly Guid OutputGuid = new Guid("7bd1acb4-07ba-4838-be56-237d3391b61f");
+        public static readonly Guid SeedGuid = new Guid("e3ea29b5-493c-48a6-9c94-c7b418b6d732");
+        public static readonly Guid BiasMark = new Guid("d579d9f1-cd6f-4236-9a66-69115ae170d3");
+        public static readonly Guid RetentionMark = new Guid("39414500-9063-470d-8ce3-744a15bbc0ff");
 
-        public List<Gene> Structure;
+        public List<Gene> Structure { get; private set; }
 
-        public Dictionary<Guid, Neuron> Neurons;
+        private List<Guid> neuronGuids;
+        private Dictionary<Guid, Neuron> neurons;
 
-        public Cluster(List<Gene> structure)
+        private readonly Random rand;
+
+        public Cluster()
+        {
+            neurons = new Dictionary<Guid, Neuron>();
+            neuronGuids = new List<Guid>();
+            rand = new Random();
+        }
+
+        public static double RandomSynapseStrength()
+        {
+            // random value between -1 and 1
+            return new Random().NextDouble() * 2 - 1;
+        }
+
+        public List<double> Querry(List<double> inputs)
+        {
+            Propagate(inputs);
+
+            var outputNeurons = new List<Gene>();
+            var outputs = new List<double>();
+
+            foreach (var key in neurons[OutputGuid].Dendrites.Keys)
+            {
+                double response = key.TrueAxon;
+
+                outputNeurons.Add((key.Identifier, OutputGuid, response)); // ading axon instead of strength as its what represents the output
+            }
+
+            outputNeurons.Sort(); // makes sure the order is correct related to the input
+
+            foreach (var neuron in outputNeurons)
+                outputs.Add(neuron.Strength);
+
+            return outputs;
+        }
+
+        public List<Gene> GenerateFromStructure(List<Gene> structure, bool allowMutation = false)
         {
             Structure = new List<Gene>(structure);
 
-            var labels = new HashSet<int>();
+            Structure.Sort();
 
-            Neurons = new Dictionary<Guid, Neuron>();
-
-            GenerateFromStructure();
-        }
-
-        public double Querry(List<double> inputs)
-        {
-            // this is hacked improve later
-
-            for (int i = 0; i < inputs.Count && i < Neurons[InputGuid].Synapses.Count; ++i)
+            neuronGuids = new List<Guid>();
+            neurons = new Dictionary<Guid, Neuron>
             {
-                var inputNeuron = Neurons[InputGuid].Synapses[i];
+                // Adding the input refference
+                { InputGuid, new Neuron(InputGuid, this) },
 
-                inputNeuron.Dendrites[Neurons[InputGuid]] = inputs[i];
-            }
+                // Adding the output refference
+                { OutputGuid, new Neuron(OutputGuid, this) }
+            };
 
-            Propagate();
-
-            Neuron outputNeuron = null;
-            foreach (var key in Neurons[OutputGuid].Dendrites.Keys)
-            {
-                outputNeuron = key;
-                break;
-            }
-            if (outputNeuron == null) return 0;
-
-            return outputNeuron.Axon;
-        }
-
-        private void GenerateFromStructure()
-        {
-            // Adding the input
-            Neurons.Add(InputGuid, new Neuron(InputGuid));
-
-            // Adding the output
-            Neurons.Add(OutputGuid, new Neuron(OutputGuid));
-
-            foreach(var elem in Structure)
+            foreach (var elem in Structure)
             {
                 Guid source = elem.Source;
                 Guid dest = elem.Destination;
                 double strength = elem.Strength;
 
-                if (!Neurons.ContainsKey(source))
-                    Neurons.Add(source, new Neuron(source));
+                if (!neurons.ContainsKey(source))
+                {
+                    if (source != BiasMark && source != RetentionMark)
+                    {
+                        AddNeuron(new Neuron(source, this));
+                    }
+                }
 
-                if (!Neurons.ContainsKey(dest))
-                    Neurons.Add(dest, new Neuron(dest));
+                if (!neurons.ContainsKey(dest))
+                {
+                    AddNeuron(new Neuron(dest, this));
+                }
 
-                Neurons[dest].CreateSynapse(Neurons[source], strength);
+                if (source == BiasMark)
+                    neurons[dest].Bias = strength;
+                else if (source == RetentionMark)
+                    neurons[dest].Retention = strength;
+                else
+                    neurons[dest].CreateSynapse(neurons[source], strength);
             }
+
+            if (!neurons.ContainsKey(SeedGuid)) // this means the net is only made out of IO nodes, so need to create seed neuron manually
+            {
+                AddNeuron(new Neuron(SeedGuid, this));
+                neurons[SeedGuid].Bias = RandomSynapseStrength();
+                neurons[SeedGuid].Retention = Math.Abs(RandomSynapseStrength());
+
+                Structure = RecreateStructure();
+            }
+
+            if (allowMutation)
+            {
+                var list = new List<Guid>(neuronGuids);
+
+                foreach (var guid in list)
+                    neurons[guid].Mutate();
+
+                Structure = RecreateStructure();
+            }
+
+            return Structure;
+        }
+
+        public List<Gene> RecreateStructure()
+        {
+            var structure = new List<Gene>();
+
+            foreach(var guid in neurons.Keys)
+            {
+                if (guid == InputGuid || guid == OutputGuid) continue;
+
+                structure.Add((BiasMark, guid, neurons[guid].Bias));
+                structure.Add((RetentionMark, guid, neurons[guid].Retention));
+            }
+
+            foreach(var dest in neurons.Keys)
+                foreach(var source in neurons[dest].Dendrites)
+                    structure.Add((source.Key.Identifier, dest, source.Value));
+
+            return structure;
+        }
+
+        public Neuron GetNeuron(Guid id)
+        {
+            return neurons[id];
+        }
+
+        public void AddNeuron(Neuron neuron)
+        {
+            if (neurons.ContainsKey(neuron.Identifier)) return;
+
+            neurons.Add(neuron.Identifier, neuron);
+            neuronGuids.Add(neuron.Identifier);
+        }
+
+        public void RemoveNeuron(Neuron neuron)
+        {
+            if (!neurons.ContainsKey(neuron.Identifier)) return;
+
+            neurons.Remove(neuron.Identifier);
+            neuronGuids.Remove(neuron.Identifier);
+        }
+
+        public Neuron RandomNeuron()
+        {
+            int index = rand.Next(0, neuronGuids.Count);
+
+            return neurons[neuronGuids[index]];
         }
 
         /// <summary>
         /// Fires all neurons in the cluster BFS style.
         /// </summary>
         /// <returns>True if the graph has a cycle, false if the graph is a tree.</returns>
-        private void Propagate()
+        private void Propagate(List<double> inputs)
         {
-            var fired = new HashSet<Neuron>();
             var queue = new Queue<Neuron>();
 
-            fired.Add(Neurons[InputGuid]);
-            fired.Add(Neurons[OutputGuid]);
+            // baking the inputs into the input neuron axons
+            for(int i = 0; i < neurons[InputGuid].Connections.Count; ++i)
+            {
+                var inputNeuron = neurons[InputGuid].Connections[i];
 
-            foreach(var successor in Neurons[InputGuid].Synapses)
-                queue.Enqueue(successor);
+                inputNeuron.Fire(inputs[i]);
+
+                foreach (var successor in inputNeuron.Connections)
+                    queue.Enqueue(successor);
+            }
 
             while (queue.Count > 0)
             {
                 var current = queue.Dequeue();
 
-                if (fired.Contains(current)) continue;
-
                 if (current.Fire())
                 {
-                    fired.Add(current);
-
-                    foreach (var successor in current.Synapses)
+                    foreach (var successor in current.Connections)
                     {
-                        if (!fired.Contains(successor))
-                            queue.Enqueue(successor);
+                        queue.Enqueue(successor);
                     }
                 } 
             }

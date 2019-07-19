@@ -1,65 +1,123 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
-    public class Environment
-    {
-        public List<double[]> Input { get; set; }
-        public List<double> ExpectedOutput { get; set; }
 
-        public List<Gene> Run(int generations, List<double[]> input, List<double> expectedOutput)
+    public class Environment : IObservable<List<Gene>>
+    {
+        private Population population;
+        private bool isRunning;
+        private List<IObserver<List<Gene>>> observers;
+        private List<Task<Chromosome>> breedTasks;
+
+        public Environment()
         {
-            var rand = new Random();
-            Input = input;
-            ExpectedOutput = expectedOutput;
+            observers = new List<IObserver<List<Gene>>>();
+            isRunning = false;
+        }
+
+        public IDisposable Subscribe(IObserver<List<Gene>> observer)
+        {
+            // Check whether observer is already registered. If not, add it
+            if (!observers.Contains(observer))
+            {
+                observers.Add(observer);
+            }
+
+            return new Unsubscriber<List<Gene>>(observers, observer);
+        }
+
+        public Task Start(DataCollection data)
+        {
+            if (isRunning)
+                return null;
+
+            isRunning = true;
+
+            breedTasks = new List<Task<Chromosome>>();
 
             // generate population
-            var population = new Population(rand);
-            population.GeneratePopulation(2, 1);
+            population = new Population(2, 1, data);
 
-            for (int i = 0; i < population.Folk.Count; ++i)
+            for (int i = 0; i < 6; ++i)
+                breedTasks.Add(Breed());
+
+            return Run();
+        }
+
+        public void Stop()
+        {
+            isRunning = false;
+
+            for(int i = observers.Count - 1; i >= 0; --i)
             {
-                population.Folk[i].EvaluateFitness(input, expectedOutput);
+                observers[i].OnCompleted();
             }
+        }
 
-            int kidPerPair = 3;
-            int batchSize = 3 * kidPerPair;
-            var batch = new Chromosome[batchSize];
-
-            for (int k = 0; k < generations; ++k)
+        private async Task Run()
+        {
+            while (isRunning)
             {
-                Chromosome parent1 = null;
-                Chromosome parent2 = null;
+                var completed = await Task.WhenAny(breedTasks);
 
-                for (int i = 0; i < batch.Length; ++i)
-                {
-                    // torunament
-                    if (i % kidPerPair == 0)
-                    {
-                        parent1 = population.Tournament(null);
-                        parent2 = population.Tournament(parent1);
-                    }
+                foreach (var observer in observers)
+                    observer.OnNext(completed.GetAwaiter().GetResult().Genes);
 
-                    // crossover
-                    var child = Chromosome.CrossOver(parent1, parent2, i % kidPerPair, rand);
-
-                    // mutation
-                    child.Mutate();
-
-                    child.Generation = Math.Max(parent1.Generation, parent2.Generation) + 1;
-
-                    if (child.GeneGuids.Count > 0)
-                        batch[i] = child;
-                }
-
-                for (int i = 0; i < batch.Length; ++i)
-                    batch[i].EvaluateFitness(input, expectedOutput);
-
-                population.AddKids(batch);
+                int index = breedTasks.IndexOf(completed);
+                breedTasks[index] = Breed();
             }
+        }
 
-            return population.GetBest().Genes;
+        // Returns the fittest member at the point the task completed
+       private Task<Chromosome> Breed()
+        {
+            return Task.Run(() =>
+            {
+                int motherIndex, fatherIndex;
+
+                Chromosome mother = null;
+                Chromosome father = null;
+
+                motherIndex = population.Tournament(null);
+                mother = population.Members[motherIndex];
+
+                fatherIndex = population.Tournament(mother);
+                father = population.Members[fatherIndex];
+
+                var child = Chromosome.CrossOver(mother, father);
+
+                child.EvaluateFitness();
+
+                if (child.FitnessValue > population.Members[0].FitnessValue)
+                    population.Members[0] = child;
+                else if (mother.FitnessValue >= father.FitnessValue)
+                    population.Members[fatherIndex] = child;
+                else
+                    population.Members[motherIndex] = child;
+
+                return population.Members[0];
+            });
+        }
+    }
+
+    internal class Unsubscriber<List> : IDisposable
+    {
+        private List<IObserver<List<Gene>>> _observers;
+        private IObserver<List<Gene>> _observer;
+
+        internal Unsubscriber(List<IObserver<List<Gene>>> observers, IObserver<List<Gene>> observer)
+        {
+            this._observers = observers;
+            this._observer = observer;
+        }
+
+        public void Dispose()
+        {
+            if (_observers.Contains(_observer))
+                _observers.Remove(_observer);
         }
     }
 }

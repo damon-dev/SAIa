@@ -1,63 +1,95 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
-    class Program
+    class Program : IObserver<List<Gene>>
     {
+        private IDisposable stopper;
+        private List<Gene> currentStructure;
+
         static void Main(string[] args)
         {
-            // create training set for XOR
+            var data = new DataCollection();
+            var program = new Program();
+            var environment = new Environment();
 
-            int dataTrainSize = 100;
-            var inputTrain = new List<double[]>();
-            var outputTrain = new List<double>();
-            var rand = new Random();
+            program.stopper = environment.Subscribe(program);
 
-            for (int i = 0; i < dataTrainSize; ++i)
+            Task.Run(async () =>
             {
-                int a = rand.Next(0, 2);
-                int b = rand.Next(0, 2);
+                while (true)
+                {
+                    await Task.Delay(1000);
+                    if (program.currentStructure != null)
+                        program.Display(program.currentStructure);
+                }
+            });
 
-                inputTrain.Add(new double[] { a, b });
-                outputTrain.Add(a ^ b);
+            environment.Start(data);
+
+            Console.ReadLine();
+
+            environment.Stop();
+        }
+
+        public void OnCompleted()
+        {
+            stopper.Dispose();
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(List<Gene> structure)
+        {
+            if (!structure.Equals(currentStructure))
+            {
+                currentStructure = structure;
+            }
+        }
+
+        private void Display(List<Gene> structure)
+        {
+            var cluster = new Cluster();
+            structure = new List<Gene>(structure);
+
+            cluster.GenerateFromStructure(structure);
+
+            var input = new List<List<double>>
+            {
+                new List<double> { 0, 0 },
+                new List<double> { 0, 1 },
+                new List<double> { 1, 0 },
+                new List<double> { 1, 1 }
+            };
+
+
+            var output = new List<List<double>>();
+            
+            output.Add(cluster.Querry(input[0]));
+            cluster.GenerateFromStructure(structure);
+            output.Add(cluster.Querry(input[1]));
+            cluster.GenerateFromStructure(structure);
+            output.Add(cluster.Querry(input[2]));
+            cluster.GenerateFromStructure(structure);
+            output.Add(cluster.Querry(input[3]));
+            
+            /*
+            var output = new List<List<double>>();
+            output.Add(cluster.Querry(input[0]));
+            output.Add(cluster.Querry(input[1]));
+            output.Add(cluster.Querry(input[2]));
+            output.Add(cluster.Querry(input[3]));
+            */
+            for (int i = 0; i < input.Count; ++i)
+            {
+                Console.WriteLine($"{input[i][0]} ^ {input[i][1]} = {output[i][0]}");
             }
 
-            // create test set for XOR
-
-            int dataTestSize = 10;
-            var inputTest = new List<double[]>();
-            var outputTest= new List<double>();
-
-            for (int i = 0; i < dataTestSize; ++i)
-            {
-                int a = rand.Next(0, 2);
-                int b = rand.Next(0, 2);
-
-                inputTest.Add(new double[] { a, b });
-                outputTest.Add(a ^ b);
-            }
-
-            // train
-            var gAlg = new Environment();
-
-            int runs = 50000;
-            var bestStructure = gAlg.Run(runs, inputTrain, outputTrain);
-
-            Console.WriteLine($"Ready!");
-            var champ = new Cluster(bestStructure);
-
-            do
-            {
-                var inp = Console.ReadLine();
-                string[] inpsp = inp.Split(' ');
-                int a = int.Parse(inpsp[0]);
-                int b = int.Parse(inpsp[1]);
-
-                double result = champ.Querry(new List<double> { a, b });
-                Console.WriteLine(result);
-            }
-            while (true);
+            Console.SetCursorPosition(0, Console.CursorTop - 4);
         }
     }
 }

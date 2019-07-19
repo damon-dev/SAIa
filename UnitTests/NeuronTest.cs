@@ -15,7 +15,7 @@ namespace UnitTests
 
             Assert.IsNotNull(neuron.Identifier);
             Assert.IsNotNull(neuron.Dendrites);
-            Assert.IsNotNull(neuron.Synapses);
+            Assert.IsNotNull(neuron.Connections);
             Assert.AreEqual(1, neuron.Axon); // has to be this way to facilitate bias nodes
         }
 
@@ -27,7 +27,7 @@ namespace UnitTests
 
             target.CreateSynapse(origin, 0.2);
 
-            Assert.IsTrue(origin.Synapses.Exists(t => t.Equals(target)));
+            Assert.IsTrue(origin.Connections.Exists(t => t.Equals(target)));
             Assert.IsTrue(target.Dendrites.ContainsKey(origin));
             Assert.AreEqual(target.Dendrites[origin], 0.2);
 

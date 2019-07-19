@@ -5,7 +5,7 @@ namespace EvolutionalNeuralNetwork
     /// <summary>
     /// Describes a edge with its weight in the graph.
     /// </summary>
-    public class Gene : IComparable<Gene>
+    public struct Gene : IComparable<Gene>
     {
         public Guid Source { get; set; }
         public Guid Destination { get; set; }
