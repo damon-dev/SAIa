@@ -56,8 +56,6 @@ namespace EvolutionalNeuralNetwork
             var cluster = new Cluster();
             structure = new List<Gene>(structure);
 
-            cluster.GenerateFromStructure(structure);
-
             var input = new List<List<double>>
             {
                 new List<double> { 0, 0 },
@@ -65,31 +63,34 @@ namespace EvolutionalNeuralNetwork
                 new List<double> { 1, 0 },
                 new List<double> { 1, 1 }
             };
-
-
             var output = new List<List<double>>();
-            
-            output.Add(cluster.Querry(input[0]));
+            double totalTime = 0;
+
             cluster.GenerateFromStructure(structure);
-            output.Add(cluster.Querry(input[1]));
-            cluster.GenerateFromStructure(structure);
-            output.Add(cluster.Querry(input[2]));
-            cluster.GenerateFromStructure(structure);
-            output.Add(cluster.Querry(input[3]));
-            
-            /*
-            var output = new List<List<double>>();
-            output.Add(cluster.Querry(input[0]));
-            output.Add(cluster.Querry(input[1]));
-            output.Add(cluster.Querry(input[2]));
-            output.Add(cluster.Querry(input[3]));
-            */
+            output.Add(cluster.Querry(input[0], out TimeSpan time));
+            cluster.Nap();
+            totalTime += time.TotalSeconds;
+
+            output.Add(cluster.Querry(input[1], out time));
+            cluster.Nap();
+            totalTime += time.TotalSeconds;
+
+            output.Add(cluster.Querry(input[2], out time));
+            cluster.Nap();
+            totalTime += time.TotalSeconds;
+
+            output.Add(cluster.Querry(input[3], out time));
+            totalTime += time.TotalSeconds;
+
+            totalTime /= 4;
+
             for (int i = 0; i < input.Count; ++i)
             {
-                Console.WriteLine($"{input[i][0]} ^ {input[i][1]} = {output[i][0]}");
+                Console.WriteLine($"{input[i][0]} ^ {input[i][1]} = {output[i][0]:0.00000}");
             }
 
-            Console.SetCursorPosition(0, Console.CursorTop - 4);
+            Console.WriteLine($"Average time: {totalTime:0.00000}");
+            Console.SetCursorPosition(0, Console.CursorTop - 5);
         }
     }
 }

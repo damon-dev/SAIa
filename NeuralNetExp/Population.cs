@@ -5,7 +5,7 @@ namespace EvolutionalNeuralNetwork
 {
     public class Population
     {
-        public List<Chromosome> Members { get; set; }
+        public List<Entity> Members { get; set; }
         public int Size { get; set; } = 100;
         public int TournamentSize { get; set; } = 10; // 10% of total data size
 
@@ -13,16 +13,16 @@ namespace EvolutionalNeuralNetwork
 
         public Population(int inputSize, int outputSize, DataCollection data)
         {
-            Members = new List<Chromosome>();
+            Members = new List<Entity>();
             rand = new Random();
 
             GenerateMembers(inputSize, outputSize, data);
         }
 
-        public int Tournament(Chromosome mate)
+        public int Tournament(Entity mate)
         {
-            int bestPosition = 0;
-            Chromosome bestMate = null;
+            int position = 0;
+            Entity bestMate = null;
             double bestFitnes = double.MinValue;
 
             for (int i = 0; i < TournamentSize; ++i)
@@ -32,11 +32,31 @@ namespace EvolutionalNeuralNetwork
                 {
                     bestMate = Members[index];
                     bestFitnes = bestMate.FitnessValue;
-                    bestPosition = index;
+                    position = index;
                 }
             }
 
-            return bestPosition;
+            return position;
+        }
+
+        public int Victim()
+        {
+            int position = 0;
+            Entity weakestPrey = null;
+            double worstFitness = double.MaxValue;
+
+            for (int i = 0; i < TournamentSize; ++i)
+            {
+                int index = rand.Next(1, Members.Count);
+                if (Members[index].FitnessValue < worstFitness)
+                {
+                    weakestPrey = Members[index];
+                    worstFitness = weakestPrey.FitnessValue;
+                    position = index;
+                }
+            }
+
+            return position;
         }
 
         private void GenerateMembers(int inputSize, int outputSize, DataCollection data)
@@ -57,18 +77,18 @@ namespace EvolutionalNeuralNetwork
             foreach (var iGuid in inputGuids)
             {
                 initialStructure.Add((Cluster.InputGuid, iGuid, 0));
-                initialStructure.Add((Cluster.RetentionMark, iGuid, 1));
+                initialStructure.Add((Cluster.RecoveryMark, iGuid, 1));
             }
 
             // Linking output neurons to the refference node
             foreach (var oGuid in outputGuids)
             {
                 initialStructure.Add((oGuid, Cluster.OutputGuid, 0));
-                initialStructure.Add((Cluster.RetentionMark, oGuid, 1));
+                initialStructure.Add((Cluster.RecoveryMark, oGuid, 1));
             }
 
             for (int i = 0; i < Size; ++i)
-                Members.Add(new Chromosome(initialStructure, data));
+                Members.Add(new Entity(initialStructure, data));
         }
     }
 }

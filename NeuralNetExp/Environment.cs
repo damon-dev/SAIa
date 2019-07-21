@@ -10,7 +10,7 @@ namespace EvolutionalNeuralNetwork
         private Population population;
         private bool isRunning;
         private List<IObserver<List<Gene>>> observers;
-        private List<Task<Chromosome>> breedTasks;
+        private List<Task<Entity>> breedTasks;
 
         public Environment()
         {
@@ -36,12 +36,12 @@ namespace EvolutionalNeuralNetwork
 
             isRunning = true;
 
-            breedTasks = new List<Task<Chromosome>>();
+            breedTasks = new List<Task<Entity>>();
 
             // generate population
             population = new Population(2, 1, data);
 
-            for (int i = 0; i < 6; ++i)
+            for (int i = 0; i < 1; ++i)
                 breedTasks.Add(Breed());
 
             return Run();
@@ -72,14 +72,14 @@ namespace EvolutionalNeuralNetwork
         }
 
         // Returns the fittest member at the point the task completed
-       private Task<Chromosome> Breed()
+        private Task<Entity> Breed()
         {
             return Task.Run(() =>
             {
                 int motherIndex, fatherIndex;
 
-                Chromosome mother = null;
-                Chromosome father = null;
+                Entity mother = null;
+                Entity father = null;
 
                 motherIndex = population.Tournament(null);
                 mother = population.Members[motherIndex];
@@ -87,16 +87,22 @@ namespace EvolutionalNeuralNetwork
                 fatherIndex = population.Tournament(mother);
                 father = population.Members[fatherIndex];
 
-                var child = Chromosome.CrossOver(mother, father);
+                var child = mother.CrossOver(father);
 
                 child.EvaluateFitness();
 
                 if (child.FitnessValue > population.Members[0].FitnessValue)
                     population.Members[0] = child;
-                else if (mother.FitnessValue >= father.FitnessValue)
-                    population.Members[fatherIndex] = child;
                 else
-                    population.Members[motherIndex] = child;
+                {
+                    int prey = population.Victim();
+                    if (child.FitnessValue > population.Members[prey].FitnessValue)
+                        population.Members[prey] = child;
+                    else if (mother.FitnessValue >= father.FitnessValue)
+                        population.Members[fatherIndex] = child;
+                    else
+                        population.Members[motherIndex] = child;
+                }
 
                 return population.Members[0];
             });
@@ -106,12 +112,12 @@ namespace EvolutionalNeuralNetwork
     internal class Unsubscriber<List> : IDisposable
     {
         private List<IObserver<List<Gene>>> _observers;
-        private IObserver<List<Gene>> _observer;
+        private readonly IObserver<List<Gene>> _observer;
 
         internal Unsubscriber(List<IObserver<List<Gene>>> observers, IObserver<List<Gene>> observer)
         {
-            this._observers = observers;
-            this._observer = observer;
+            _observers = observers;
+            _observer = observer;
         }
 
         public void Dispose()

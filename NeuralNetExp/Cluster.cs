@@ -9,7 +9,7 @@ namespace EvolutionalNeuralNetwork
         public static readonly Guid OutputGuid = new Guid("7bd1acb4-07ba-4838-be56-237d3391b61f");
         public static readonly Guid SeedGuid = new Guid("e3ea29b5-493c-48a6-9c94-c7b418b6d732");
         public static readonly Guid BiasMark = new Guid("d579d9f1-cd6f-4236-9a66-69115ae170d3");
-        public static readonly Guid RetentionMark = new Guid("39414500-9063-470d-8ce3-744a15bbc0ff");
+        public static readonly Guid RecoveryMark = new Guid("39414500-9063-470d-8ce3-744a15bbc0ff");
 
         public List<Gene> Structure { get; private set; }
 
@@ -31,16 +31,16 @@ namespace EvolutionalNeuralNetwork
             return new Random().NextDouble() * 2 - 1;
         }
 
-        public List<double> Querry(List<double> inputs)
+        public List<double> Querry(List<double> inputs, out TimeSpan time)
         {
-            Propagate(inputs);
+            time =  Propagate(inputs);
 
             var outputNeurons = new List<Gene>();
             var outputs = new List<double>();
 
             foreach (var key in neurons[OutputGuid].Dendrites.Keys)
             {
-                double response = key.TrueAxon;
+                double response = key.Signal;
 
                 outputNeurons.Add((key.Identifier, OutputGuid, response)); // ading axon instead of strength as its what represents the output
             }
@@ -51,6 +51,12 @@ namespace EvolutionalNeuralNetwork
                 outputs.Add(neuron.Strength);
 
             return outputs;
+        }
+
+        public void Nap()
+        {
+            foreach (var neuron in neurons.Values)
+                neuron.Fire(0);
         }
 
         public List<Gene> GenerateFromStructure(List<Gene> structure, bool allowMutation = false)
@@ -77,7 +83,7 @@ namespace EvolutionalNeuralNetwork
 
                 if (!neurons.ContainsKey(source))
                 {
-                    if (source != BiasMark && source != RetentionMark)
+                    if (source != BiasMark && source != RecoveryMark)
                     {
                         AddNeuron(new Neuron(source, this));
                     }
@@ -90,8 +96,8 @@ namespace EvolutionalNeuralNetwork
 
                 if (source == BiasMark)
                     neurons[dest].Bias = strength;
-                else if (source == RetentionMark)
-                    neurons[dest].Retention = strength;
+                else if (source == RecoveryMark)
+                    neurons[dest].Recovery = strength;
                 else
                     neurons[dest].CreateSynapse(neurons[source], strength);
             }
@@ -100,7 +106,7 @@ namespace EvolutionalNeuralNetwork
             {
                 AddNeuron(new Neuron(SeedGuid, this));
                 neurons[SeedGuid].Bias = RandomSynapseStrength();
-                neurons[SeedGuid].Retention = Math.Abs(RandomSynapseStrength());
+                neurons[SeedGuid].Recovery = Math.Abs(RandomSynapseStrength());
 
                 Structure = RecreateStructure();
             }
@@ -127,7 +133,7 @@ namespace EvolutionalNeuralNetwork
                 if (guid == InputGuid || guid == OutputGuid) continue;
 
                 structure.Add((BiasMark, guid, neurons[guid].Bias));
-                structure.Add((RetentionMark, guid, neurons[guid].Retention));
+                structure.Add((RecoveryMark, guid, neurons[guid].Recovery));
             }
 
             foreach(var dest in neurons.Keys)
@@ -169,9 +175,10 @@ namespace EvolutionalNeuralNetwork
         /// Fires all neurons in the cluster BFS style.
         /// </summary>
         /// <returns>True if the graph has a cycle, false if the graph is a tree.</returns>
-        private void Propagate(List<double> inputs)
+        private TimeSpan Propagate(List<double> inputs)
         {
             var queue = new Queue<Neuron>();
+            var timeStamp = DateTime.UtcNow;
 
             // baking the inputs into the input neuron axons
             for(int i = 0; i < neurons[InputGuid].Connections.Count; ++i)
@@ -196,6 +203,8 @@ namespace EvolutionalNeuralNetwork
                     }
                 } 
             }
+
+            return DateTime.UtcNow - timeStamp;
         }
     }
 }

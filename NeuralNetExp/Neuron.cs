@@ -9,29 +9,43 @@ namespace EvolutionalNeuralNetwork
         public const double MutationRate = 0.01;
 
         public Guid Identifier { get; private set; }
+        public DateTime LastFired { get; private set; }
+        public double Signal { get; private set; }
         public Dictionary<Neuron, double> Dendrites { get; set; }
         public List<Neuron> Connections { get; set; }
-        public DateTime LastFired { get; private set; }
         public double Bias { get; set; }
-        public double Retention { get; set; } // the greater it is the longer the neuron preserves a value
-        public double TrueAxon { get; private set; }
-        public double Axon
+        public double Recovery { get; set; } // relative refactory period recovery rate (greater = faster)
+
+        private double _axon;
+        private double Axon
         {
             get
             {
-                var diff = DateTime.UtcNow - LastFired;
+                double temp = _axon - Signal;
+                if (temp >= 0)
+                {
+                    _axon = temp;
+                    return Signal;
+                }
 
-                if (Retention <= 0) return 0;
-
-                double coef = diff.TotalDays * diff.TotalDays * 1/Retention;
-                if (coef <= 1) return TrueAxon;
-
-                return TrueAxon / coef;
+                return 0;
             }
             set
             {
                 LastFired = DateTime.UtcNow;
-                TrueAxon = value;
+                Signal = value;
+                _axon = Signal * Connections.Count;
+            }
+        }
+
+        private double Threshold
+        {
+            get
+            {
+                var time = DateTime.UtcNow - LastFired;
+                double denominator = time.TotalMilliseconds * time.TotalMilliseconds * Recovery;
+
+                return (denominator <= 0) ? double.MaxValue : Signal / denominator;
             }
         }
 
@@ -43,7 +57,7 @@ namespace EvolutionalNeuralNetwork
             Identifier = guid;
             Dendrites = new Dictionary<Neuron, double>();
             Connections = new List<Neuron>();
-            Axon = 0; // important to have at 0
+            Axon = 0;
 
             parentCluster = _parentCluster;
             rand = new Random();
@@ -69,10 +83,12 @@ namespace EvolutionalNeuralNetwork
 
         public bool Activate(double signal)
         {
-            if (signal > Axon)
+            signal -= Threshold;
+
+            if (signal > 0)
             {
-                Axon = Math.Max(0, signal);
-                return Axon > 0;
+                Axon = signal;
+                return true;
             }
 
             return false;
@@ -129,7 +145,7 @@ namespace EvolutionalNeuralNetwork
             }
 
             percent = rand.Next(0, 100);
-            if (percent < 80)
+            if (percent < 60)
             {   // dendrite value change
                 index = rand.Next(0, Dendrites.Keys.Count + 1);
 
@@ -158,7 +174,7 @@ namespace EvolutionalNeuralNetwork
             if (percent < 10)
             {
                 // mutated retention
-                Retention = Math.Abs(Cluster.RandomSynapseStrength());
+                Recovery = Math.Abs(Cluster.RandomSynapseStrength());
             }
         }
 

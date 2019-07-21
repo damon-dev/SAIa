@@ -3,16 +3,19 @@ using System.Collections.Generic;
 
 namespace EvolutionalNeuralNetwork
 {
-    public class Chromosome
+    public class Entity
     {
         public List<Gene> Genes { get; private set; }
         public double FitnessValue { get; private set; } // the greated the better
         public DataCollection DataSource { get; private set; }
 
-        public Chromosome(List<Gene> initialStructure, DataCollection _dataSource)
+        private Random rand;
+
+        public Entity(List<Gene> initialStructure, DataCollection _dataSource)
         {
             DataSource = _dataSource;
             Genes = new List<Gene>(initialStructure);
+            rand = new Random();
         }
 
         public void EvaluateFitness()
@@ -22,32 +25,35 @@ namespace EvolutionalNeuralNetwork
 
             double meanSquareSum = 0;
             var cluster = new Cluster();
+            double totalTime = 0;
 
             Genes = cluster.GenerateFromStructure(Genes, true);
             
             for (int i = 0; i < input.Count; ++i)
             {
                 double squareSum = 0;
-                var predictedOutput = cluster.Querry(input[i]);
-                cluster.GenerateFromStructure(Genes);
+                var predictedOutput = cluster.Querry(input[i], out TimeSpan time);
+                cluster.Nap();
                 for (int j = 0; j < expectedOutput[i].Count; ++j)
                     squareSum += (predictedOutput[j] - expectedOutput[i][j]) * (predictedOutput[j] - expectedOutput[i][j]);
 
                 squareSum /= expectedOutput[i].Count;
                 meanSquareSum += squareSum;
+                totalTime += time.TotalSeconds;
             }
 
             meanSquareSum /= input.Count;
+            totalTime /= input.Count;
 
             if (meanSquareSum == 0) FitnessValue = double.MaxValue;
 
-            FitnessValue = 1 / meanSquareSum;
+            FitnessValue = 1 / (meanSquareSum + totalTime);
         }
 
-        public static Chromosome CrossOver(Chromosome mother, Chromosome father)
+        public Entity CrossOver(Entity father)
         {
-            Chromosome baby;
-            Random rand = new Random();
+            Entity mother = this;
+            Entity baby;
 
             var motherGenes = new List<Gene>(mother.Genes);
             var fatherGenes = new List<Gene>(father.Genes);
@@ -60,7 +66,7 @@ namespace EvolutionalNeuralNetwork
             var fatherUniqueStructure = new List<Gene>();
 
             int m = 0, f = 0;
-            while(m < motherGenes.Count && f < fatherGenes.Count)
+            while (m < motherGenes.Count && f < fatherGenes.Count)
             {
                 var X = motherGenes[m];
                 var Y = fatherGenes[f];
@@ -115,7 +121,7 @@ namespace EvolutionalNeuralNetwork
             switch (rand.Next(0, 3))
             {
                 case 0: // more like mother
-                    baby = new Chromosome(commonStructure, mother.DataSource);
+                    baby = new Entity(commonStructure, mother.DataSource);
 
                     int b = 0;
                     for(m = 0; m < motherGenes.Count && b < baby.Genes.Count; ++m)
@@ -134,7 +140,7 @@ namespace EvolutionalNeuralNetwork
                     return baby;
 
                 case 1: // similar to both
-                    baby = new Chromosome(commonStructure, mother.DataSource);
+                    baby = new Entity(commonStructure, mother.DataSource);
 
                     baby.Genes.AddRange(motherUniqueStructure);
                     baby.Genes.AddRange(fatherUniqueStructure);
@@ -142,7 +148,7 @@ namespace EvolutionalNeuralNetwork
                     return baby;
 
                 case 2: // more like father
-                    baby = new Chromosome(commonStructure, father.DataSource);
+                    baby = new Entity(commonStructure, father.DataSource);
 
                     b = 0;
                     for (f = 0; f < fatherGenes.Count && b < baby.Genes.Count; ++f)
@@ -165,7 +171,7 @@ namespace EvolutionalNeuralNetwork
         }
         
         // how much needs to be substracted from x to get randomly closer to target
-        private static double CalculateOffset(double x, double target)
+        private double CalculateOffset(double x, double target)
         {
             int precision = 1000000;
             double diff = x - target;
@@ -173,7 +179,7 @@ namespace EvolutionalNeuralNetwork
 
             int range = (int)(sign * diff * precision);
 
-            int offset = new Random().Next(range);
+            int offset = rand.Next(range);
 
             double result = sign * (double)offset / precision;
 

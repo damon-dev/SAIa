@@ -16,7 +16,7 @@ namespace UnitTests
             Assert.IsNotNull(neuron.Identifier);
             Assert.IsNotNull(neuron.Dendrites);
             Assert.IsNotNull(neuron.Connections);
-            Assert.AreEqual(1, neuron.Axon); // has to be this way to facilitate bias nodes
+            Assert.AreEqual(1, neuron.Threshold); // has to be this way to facilitate bias nodes
         }
 
         [TestMethod]
@@ -49,17 +49,17 @@ namespace UnitTests
             }
 
             Assert.IsFalse(target.Fire());
-            Assert.AreEqual(0, target.Axon);
+            Assert.AreEqual(0, target.Threshold);
 
             target.Dendrites[origins[0]] += 0.1;
 
             Assert.IsTrue(target.Fire());
-            Assert.AreEqual(0.1, target.Axon);
+            Assert.AreEqual(0.1, target.Threshold);
 
             target.Dendrites[origins[0]] -= 0.2;
 
             Assert.IsFalse(target.Fire());
-            Assert.AreEqual(0, target.Axon);
+            Assert.AreEqual(0, target.Threshold);
         }
     }
 }
