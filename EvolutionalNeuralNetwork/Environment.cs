@@ -7,7 +7,7 @@ namespace EvolutionalNeuralNetwork
 
     public class Environment : IObservable<List<Gene>>
     {
-        private Population population;
+        private Culture culture;
         private bool isRunning;
         private List<IObserver<List<Gene>>> observers;
         private List<Task<Entity>> breedTasks;
@@ -37,7 +37,7 @@ namespace EvolutionalNeuralNetwork
             breedTasks = new List<Task<Entity>>();
 
             // generate population
-            population = new Population(data);
+            culture = new Culture(data);
 
             for (int i = 0; i < 5; ++i)
                 breedTasks.Add(Breed());
@@ -79,35 +79,35 @@ namespace EvolutionalNeuralNetwork
 
                 var rand = new Random();
 
-                motherIndex = population.Tournament(null, rand);
-                mother = population.Members[motherIndex];
+                motherIndex = culture.Tournament(null, rand);
+                mother = culture.Entities[motherIndex];
 
-                fatherIndex = population.Tournament(mother, rand);
-                father = population.Members[fatherIndex];
+                fatherIndex = culture.Tournament(mother, rand);
+                father = culture.Entities[fatherIndex];
 
                 var child = mother.CrossOver(father, rand);
 
                 child.EvaluateFitness(rand);
 
-                if (child.FitnessValue > population.Members[0].FitnessValue)
-                    population.Members[0] = child;
+                if (child.FitnessValue > culture.Entities[0].FitnessValue)
+                    culture.Entities[0] = child;
                 else
                 {
-                    int prey = population.Victim(rand);
-                    if (child.FitnessValue > population.Members[prey].FitnessValue)
-                        population.Members[prey] = child;
+                    int prey = culture.Victim(rand);
+                    if (child.FitnessValue > culture.Entities[prey].FitnessValue)
+                        culture.Entities[prey] = child;
 
-                    else if (child.FitnessValue > population.Members[fatherIndex].FitnessValue)
-                        population.Members[fatherIndex] = child;
-                    else if (child.FitnessValue > population.Members[motherIndex].FitnessValue)
-                        population.Members[motherIndex] = child;
-                    else if (population.Members[fatherIndex].FitnessValue < mother.FitnessValue)
-                        population.Members[fatherIndex] = child;
-                    else if (population.Members[motherIndex].FitnessValue < father.FitnessValue)
-                        population.Members[motherIndex] = child;
+                    else if (child.FitnessValue > culture.Entities[fatherIndex].FitnessValue)
+                        culture.Entities[fatherIndex] = child;
+                    else if (child.FitnessValue > culture.Entities[motherIndex].FitnessValue)
+                        culture.Entities[motherIndex] = child;
+                    else if (culture.Entities[fatherIndex].FitnessValue < mother.FitnessValue)
+                        culture.Entities[fatherIndex] = child;
+                    else if (culture.Entities[motherIndex].FitnessValue < father.FitnessValue)
+                        culture.Entities[motherIndex] = child;
                 }
 
-                return population.Members[0];
+                return culture.Entities[0];
             });
         }
     }

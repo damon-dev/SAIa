@@ -4,14 +4,14 @@ using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
-    public class Population
+    public class Culture
     {
-        public List<Entity> Members { get; set; }
+        public List<Entity> Entities { get; set; }
         public int Size { get; set; } = 500;
         public int TournamentSize { get; set; } = 10;
         //Random rand = new Random();
 
-        public Population(DataCollection data)
+        public Culture(DataCollection data)
         {
             GenerateMembers(data.InputWidth, data.OutputWidth, data);
         }
@@ -25,10 +25,10 @@ namespace EvolutionalNeuralNetwork
 
             for (int i = 0; i < TournamentSize; ++i)
             {
-                int index = rand.Next(0, Members.Count);
-                if (Members[index].FitnessValue > bestFitnes && !Members[index].Equals(mate))
+                int index = rand.Next(0, Entities.Count);
+                if (Entities[index].FitnessValue > bestFitnes && !Entities[index].Equals(mate))
                 {
-                    bestMate = Members[index];
+                    bestMate = Entities[index];
                     bestFitnes = bestMate.FitnessValue;
                     position = index;
                 }
@@ -46,10 +46,10 @@ namespace EvolutionalNeuralNetwork
 
             for (int i = 0; i < TournamentSize * 2; ++i)
             {
-                int index = rand.Next(1, Members.Count);
-                if (Members[index].FitnessValue < worstFitness)
+                int index = rand.Next(1, Entities.Count);
+                if (Entities[index].FitnessValue < worstFitness)
                 {
-                    weakestPrey = Members[index];
+                    weakestPrey = Entities[index];
                     worstFitness = weakestPrey.FitnessValue;
                     position = index;
                 }
@@ -100,7 +100,7 @@ namespace EvolutionalNeuralNetwork
                 members[i].EvaluateFitness(new Random());
             });
 
-            Members = new List<Entity>(members);
+            Entities = new List<Entity>(members);
         }
     }
 }

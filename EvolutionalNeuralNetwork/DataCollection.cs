@@ -5,6 +5,8 @@ namespace EvolutionalNeuralNetwork
 {
     public class DataCollection
     {
+        private const string Genealogy = "Geneaology/culture.json";
+
         public int InputWidth { get; protected set; }
         public int OutputWidth { get; protected set; }
 
