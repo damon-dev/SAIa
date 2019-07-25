@@ -1,11 +1,14 @@
 ﻿using System;
+using System.Runtime.Serialization;
 
 namespace EvolutionalNeuralNetwork
 {
     /// <summary>
     /// Describes a edge with its weight in the graph.
     /// </summary>
-    public struct Gene : IComparable<Gene>
+    /// 
+    [Serializable]
+    public struct Gene : IComparable<Gene>, ISerializable
     {
         public Guid Source { get; set; }
         public Guid Destination { get; set; }
@@ -24,6 +27,13 @@ namespace EvolutionalNeuralNetwork
             return Source.CompareTo(other.Source);
         }
 
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue(nameof(Source), Source.ToString(), typeof(string));
+            info.AddValue(nameof(Destination), Destination.ToString(), typeof(string));
+            info.AddValue(nameof(Strength), Strength);
+        }
+
         public static implicit operator Gene((Guid src, Guid dest, double str) s)
         {
             var g = new Gene
@@ -34,6 +44,13 @@ namespace EvolutionalNeuralNetwork
             };
 
             return g;
+        }
+
+        public Gene(SerializationInfo info, StreamingContext context)
+        {
+            Source = new Guid((string)info.GetValue(nameof(Source), typeof(string)));
+            Destination = new Guid((string)info.GetValue(nameof(Destination), typeof(string)));
+            Strength = (double)info.GetValue(nameof(Strength), typeof(double));
         }
     }
 }

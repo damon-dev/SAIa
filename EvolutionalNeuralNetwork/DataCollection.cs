@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace EvolutionalNeuralNetwork
@@ -33,6 +36,63 @@ namespace EvolutionalNeuralNetwork
         {
             input = TestInput.Take(count).ToList();
             output = TestOutput.Take(count).ToList();
+        }
+
+        public bool LoadCulture(out Culture culture)
+        {
+            try
+            {
+                CultureContainer container = null;
+
+                // deserialize JSON directly from a file
+                using (var file = File.OpenText(Genealogy))
+                {
+                    var serializer = new JsonSerializer();
+                    container = (CultureContainer)serializer.Deserialize(file, typeof(CultureContainer));
+                }
+
+                culture = new Culture(this, container.entities.ToList());
+
+                return true;
+            }
+            catch (Exception)
+            {
+                culture = null;
+                return false;
+            }
+        }
+
+        public bool SaveCulture(Culture culture)
+        {
+            try
+            {
+                if (culture == null) return false;
+
+                var container = new CultureContainer(culture.Entities);
+
+                // serialize JSON directly to a file
+                using (var file = File.CreateText(Genealogy))
+                {
+                    var serializer = new JsonSerializer();
+                    serializer.Serialize(file, container);
+                }
+
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+    }
+
+    class CultureContainer
+    {
+        public Entity[] entities;
+
+        public CultureContainer(List<Entity> list)
+        {
+            entities = list.ToArray();
         }
     }
 }

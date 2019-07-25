@@ -27,7 +27,7 @@ namespace EvolutionalNeuralNetwork
             return new Unsubscriber<List<Gene>>(observers, observer);
         }
 
-        public Task Start(DataCollection data)
+        public Task Start(DataCollection data, int threadCount)
         {
             if (isRunning)
                 return null;
@@ -39,7 +39,7 @@ namespace EvolutionalNeuralNetwork
             // generate population
             culture = new Culture(data);
 
-            for (int i = 0; i < 5; ++i)
+            for (int i = 0; i < threadCount; ++i)
                 breedTasks.Add(Breed());
 
             return Run();

@@ -11,9 +11,15 @@ namespace EvolutionalNeuralNetwork
         public int TournamentSize { get; set; } = 10;
         //Random rand = new Random();
 
-        public Culture(DataCollection data)
+        public Culture(DataCollection data, List<Entity> entities = null)
         {
-            GenerateMembers(data.InputWidth, data.OutputWidth, data);
+            if (entities == null)
+                GenerateMembers(data.InputWidth, data.OutputWidth, data);
+            else
+            {
+                Entities = entities;
+                Size = Entities.Count;
+            }
         }
 
         public int Tournament(Entity mate, Random rand)

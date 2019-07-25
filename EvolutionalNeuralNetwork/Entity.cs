@@ -1,24 +1,29 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 
 namespace EvolutionalNeuralNetwork
 {
+    [JsonObject]
     public class Entity
     {
+        [JsonProperty]
         public List<Gene> Genes { get; private set; }
+        [JsonProperty]
         public double FitnessValue { get; private set; } // the greated the better
-        public DataCollection DataSource { get; private set; }
+
+        private DataCollection dataSource;
 
         public Entity(List<Gene> initialStructure, DataCollection _dataSource)
         {
-            DataSource = _dataSource;
+            dataSource = _dataSource;
             Genes = new List<Gene>(initialStructure);
         }
 
         public void EvaluateFitness(Random rand)
         {
             var cluster = new Cluster(rand);
-            DataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 100);
+            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 100);
 
             double meanSquareSum = 0;
             double totalTime = 0;
@@ -119,7 +124,7 @@ namespace EvolutionalNeuralNetwork
             switch (rand.Next(0, 3))
             {
                 case 0: // more like mother
-                    baby = new Entity(commonStructure, mother.DataSource);
+                    baby = new Entity(commonStructure, mother.dataSource);
 
                     int b = 0;
                     for(m = 0; m < motherGenes.Count && b < baby.Genes.Count; ++m)
@@ -138,7 +143,7 @@ namespace EvolutionalNeuralNetwork
                     return baby;
 
                 case 1: // similar to both
-                    baby = new Entity(commonStructure, mother.DataSource);
+                    baby = new Entity(commonStructure, mother.dataSource);
 
                     baby.Genes.AddRange(motherUniqueStructure);
                     baby.Genes.AddRange(fatherUniqueStructure);
@@ -146,7 +151,7 @@ namespace EvolutionalNeuralNetwork
                     return baby;
 
                 case 2: // more like father
-                    baby = new Entity(commonStructure, father.DataSource);
+                    baby = new Entity(commonStructure, father.dataSource);
 
                     b = 0;
                     for (f = 0; f < fatherGenes.Count && b < baby.Genes.Count; ++f)
