@@ -9,6 +9,7 @@ namespace EvolutionalNeuralNetwork
     {
         private Culture culture;
         private bool isRunning;
+        private DataCollection data;
         private List<IObserver<List<Gene>>> observers;
         private List<Task<Entity>> breedTasks;
 
@@ -27,8 +28,10 @@ namespace EvolutionalNeuralNetwork
             return new Unsubscriber<List<Gene>>(observers, observer);
         }
 
-        public Task Start(DataCollection data, int threadCount)
+        public Task Start(DataCollection _data, bool fromSaved, int threadCount)
         {
+            data = _data;
+
             if (isRunning)
                 return null;
 
@@ -36,8 +39,11 @@ namespace EvolutionalNeuralNetwork
 
             breedTasks = new List<Task<Entity>>();
 
-            // generate population
-            culture = new Culture(data);
+            if (fromSaved)
+                data.LoadCulture(out culture);
+            else
+                // generate culture
+                culture = new Culture(data);
 
             for (int i = 0; i < threadCount; ++i)
                 breedTasks.Add(Breed());
@@ -48,6 +54,8 @@ namespace EvolutionalNeuralNetwork
         public void Stop()
         {
             isRunning = false;
+
+            data.SaveCulture(culture);
 
             for(int i = observers.Count - 1; i >= 0; --i)
                 observers[i].OnCompleted();

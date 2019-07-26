@@ -8,6 +8,7 @@ namespace EvolutionalNeuralNetwork
 {
     class Program : IObserver<List<Gene>>
     {
+        private const int threadCount = 5;
         private IDisposable stopper;
         private List<Gene> currentStructure;
 
@@ -16,12 +17,31 @@ namespace EvolutionalNeuralNetwork
             var program = new Program();
             var environment = new Environment();
 
-            var data = new MNISTDataCollection();
-            var displayProtocol = new MNISTDisplayProtocol(data);
+            var data = new XORDataCollection();
+            var displayProtocol = new XORDisplayProtocol(data);
 
             program.stopper = environment.Subscribe(program);
 
-            Task.Run(async () =>
+            displayProtocol.Display(null);
+
+            switch(displayProtocol.ReadResponse())
+            {
+                case Response.Load:
+                    environment.Start(data, true, threadCount);
+                    break;
+
+                case Response.Train:
+                    environment.Start(data, false, threadCount);
+                    break;
+
+                case Response.Quit:
+                    return;
+
+                default:
+                    return;
+            }
+
+            var displayTask = Task.Run(async () =>
             {
                 while (true)
                 {
@@ -30,10 +50,25 @@ namespace EvolutionalNeuralNetwork
                 }
             });
 
-            environment.Start(data);
+            Response response;
+            while((response = displayProtocol.ReadResponse()) != Response.Quit)
+            {
+                switch (response)
+                {
+                    case Response.Train:
+                        program.stopper = environment.Subscribe(program);
+                        environment.Start(data, true, threadCount);
+                        break;
 
-            Console.ReadLine();
+                    case Response.Stop:
+                        environment.Stop();
+                        break;
 
+                    default:
+                        break;
+                }
+            }
+            
             environment.Stop();
         }
 

@@ -14,10 +14,13 @@ namespace EvolutionalNeuralNetwork
 
         private DataCollection dataSource;
 
-        public Entity(List<Gene> initialStructure, DataCollection _dataSource)
+        public Entity() { }
+
+        public Entity(List<Gene> initialStructure, DataCollection _dataSource, double fitness = 0)
         {
             dataSource = _dataSource;
             Genes = new List<Gene>(initialStructure);
+            FitnessValue = fitness;
         }
 
         public void EvaluateFitness(Random rand)

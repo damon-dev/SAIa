@@ -13,13 +13,15 @@ namespace EvolutionalNeuralNetwork.MNIST
 
         public override void Display(List<Gene> structure)
         {
+            base.Display(structure);
+
             if (structure == null)
             {
                 for (int i = 0; i < 10; ++i)
                     Console.WriteLine($"{i} : {0:0.00}");
 
                 Console.WriteLine($"Average time: {0:0.00000}");
-                Console.SetCursorPosition(0, Console.CursorTop - 11);
+                Console.SetCursorPosition(0, Console.CursorTop - 12);
             }
             else
             {
@@ -73,7 +75,7 @@ namespace EvolutionalNeuralNetwork.MNIST
                     Console.WriteLine($"{i} : {goodHits[i] / totalHits[i]:0.00}");
 
                 Console.WriteLine($"Average time: {totalTime:0.00000}");
-                Console.SetCursorPosition(0, Console.CursorTop - 11);
+                Console.SetCursorPosition(0, Console.CursorTop - 12);
             }
         }
     }

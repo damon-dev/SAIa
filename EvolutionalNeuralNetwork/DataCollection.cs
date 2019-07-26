@@ -8,7 +8,7 @@ namespace EvolutionalNeuralNetwork
 {
     public class DataCollection
     {
-        private const string Genealogy = "Geneaology/culture.json";
+        private const string genealogyPath = "Geneaology/culture.json";
 
         public int InputWidth { get; protected set; }
         public int OutputWidth { get; protected set; }
@@ -45,13 +45,14 @@ namespace EvolutionalNeuralNetwork
                 CultureContainer container = null;
 
                 // deserialize JSON directly from a file
-                using (var file = File.OpenText(Genealogy))
+                using (var file = File.OpenText(genealogyPath))
                 {
                     var serializer = new JsonSerializer();
                     container = (CultureContainer)serializer.Deserialize(file, typeof(CultureContainer));
                 }
 
-                culture = new Culture(this, container.entities.ToList());
+                var entities = container.entities.Select(e => new Entity(e.Genes, this, e.FitnessValue)).ToList();
+                culture = new Culture(this, entities);
 
                 return true;
             }
@@ -69,9 +70,9 @@ namespace EvolutionalNeuralNetwork
                 if (culture == null) return false;
 
                 var container = new CultureContainer(culture.Entities);
-
+                Directory.CreateDirectory("Geneaology");
                 // serialize JSON directly to a file
-                using (var file = File.CreateText(Genealogy))
+                using (var file = File.CreateText(genealogyPath))
                 {
                     var serializer = new JsonSerializer();
                     serializer.Serialize(file, container);
@@ -92,7 +93,7 @@ namespace EvolutionalNeuralNetwork
 
         public CultureContainer(List<Entity> list)
         {
-            entities = list.ToArray();
+            entities = list?.ToArray();
         }
     }
 }

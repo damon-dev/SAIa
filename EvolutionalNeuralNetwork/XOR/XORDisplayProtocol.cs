@@ -12,6 +12,8 @@ namespace EvolutionalNeuralNetwork.XOR
 
         public override void Display(List<Gene> structure)
         {
+            base.Display(structure);
+
             if (structure == null) return;
 
             var cluster = new Cluster(new Random());
@@ -31,7 +33,7 @@ namespace EvolutionalNeuralNetwork.XOR
             totalTime /= input.Count;
 
             Console.WriteLine($"Average time: {totalTime:0.00000}");
-            Console.SetCursorPosition(0, Console.CursorTop - input.Count - 1);
+            Console.SetCursorPosition(0, Console.CursorTop - input.Count - 2);
         }
     }
 }
