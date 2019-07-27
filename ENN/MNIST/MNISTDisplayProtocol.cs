@@ -8,7 +8,7 @@ namespace EvolutionalNeuralNetwork.MNIST
     {
         public MNISTDisplayProtocol(MNISTDataCollection data)
         {
-            data.FetchTestData(out input, out expectedOutput, 1000);
+            data.FetchTestData(out input, out expectedOutput, 0);
         }
 
         public override void Display(List<Gene> structure)

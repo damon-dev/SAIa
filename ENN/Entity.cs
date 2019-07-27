@@ -26,7 +26,7 @@ namespace EvolutionalNeuralNetwork
         public void EvaluateFitness(Random rand)
         {
             var cluster = new Cluster(rand);
-            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 100);
+            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 10);
 
             double meanSquareSum = 0;
             double totalTime = 0;
@@ -51,9 +51,8 @@ namespace EvolutionalNeuralNetwork
             meanSquareSum /= input.Count;
             totalTime /= input.Count;
 
-            if (meanSquareSum == 0) FitnessValue = double.MaxValue;
-
-            FitnessValue = 1 / (meanSquareSum + totalTime);
+            if (meanSquareSum == 0) FitnessValue = double.PositiveInfinity;
+            else FitnessValue = 1 / (meanSquareSum * meanSquareSum + totalTime);
         }
 
         public Entity CrossOver(Entity father, Random rand)
@@ -179,17 +178,7 @@ namespace EvolutionalNeuralNetwork
         // how much needs to be substracted from x to get randomly closer to target
         private double CalculateOffset(double x, double target, Random rand)
         {
-            int precision = 1000000; // TODO: remove this
-            double diff = x - target;
-            int sign = (diff < 0) ? -1 : 1;
-
-            int range = (int)(sign * diff * precision);
-
-            int offset = rand.Next(range);
-
-            double result = sign * (double)offset / precision;
-
-            return result;
+            return rand.NextDouble() * (x - target);
         }
     }
 }

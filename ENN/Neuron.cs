@@ -154,7 +154,7 @@ namespace EvolutionalNeuralNetwork
             }
 
             percent = rand.Next(0, 100);
-            if (percent < 80)
+            if (percent < 60)
             {   // dendrite value change
                 index = rand.Next(0, Dendrites.Keys.Count + 1);
 
