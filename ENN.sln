@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EvolutionalNeuralNetwork", "EvolutionalNeuralNetwork\EvolutionalNeuralNetwork.csproj", "{7B34535C-1CAE-4B77-B301-D7BC6998E689}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ENN", "ENN\ENN.csproj", "{7B34535C-1CAE-4B77-B301-D7BC6998E689}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTests", "UnitTests\UnitTests.csproj", "{F873E4FB-6681-4CB6-AD9C-0ADE0BFE2C23}"
 EndProject

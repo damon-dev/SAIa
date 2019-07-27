@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
@@ -9,7 +8,6 @@ namespace EvolutionalNeuralNetwork
         public List<Entity> Entities { get; set; }
         public int Size { get; set; } = 500;
         public int TournamentSize { get; set; } = 10;
-        //Random rand = new Random();
 
         public Culture(DataCollection data, List<Entity> entities = null)
         {
@@ -27,7 +25,6 @@ namespace EvolutionalNeuralNetwork
             int position = 0;
             Entity bestMate = null;
             double bestFitnes = double.MinValue;
-            //var rand = new Random();
 
             for (int i = 0; i < TournamentSize; ++i)
             {
@@ -48,7 +45,6 @@ namespace EvolutionalNeuralNetwork
             int position = 0;
             Entity weakestPrey = null;
             double worstFitness = double.MaxValue;
-            //var rand = new Random();
 
             for (int i = 0; i < TournamentSize * 2; ++i)
             {
@@ -71,6 +67,8 @@ namespace EvolutionalNeuralNetwork
             var outputGuids = new List<Guid>();
             var cluster = new Cluster(new Random());
 
+            Entities = new List<Entity>();
+
             // Creating GUIDS for input neurons
             for (int i = 0; i < inputSize; ++i)
                 inputGuids.Add(Guid.NewGuid());
@@ -81,32 +79,14 @@ namespace EvolutionalNeuralNetwork
 
             // Linking input neurons to the reference node and the seed node
             foreach (var iGuid in inputGuids)
-            {
                 initialStructure.Add((Cluster.InputGuid, iGuid, 0));
-                initialStructure.Add((Cluster.RecoveryMark, iGuid, 1));
-
-            //    initialStructure.Add((iGuid, Cluster.SeedGuid, cluster.RandomSynapseStrength()));
-            }
 
             // Linking output neurons to the reference node and the seed node
             foreach (var oGuid in outputGuids)
-            {
                 initialStructure.Add((oGuid, Cluster.OutputGuid, 0));
-                initialStructure.Add((Cluster.RecoveryMark, oGuid, 1));
 
-            //    initialStructure.Add((Cluster.SeedGuid, oGuid, cluster.RandomSynapseStrength()));
-            }
-
-            //initialStructure.Add((Cluster.BiasMark, Cluster.SeedGuid, cluster.RandomSynapseStrength()));
-            //initialStructure.Add((Cluster.RecoveryMark, Cluster.SeedGuid, Math.Abs(cluster.RandomSynapseStrength())));
-
-            var members = new Entity[Size];
-            Parallel.For(0, Size, (i) => {
-                members[i] = new Entity(initialStructure, data);
-                members[i].EvaluateFitness(new Random());
-            });
-
-            Entities = new List<Entity>(members);
+            for (int i = 0; i < Size; ++i)
+                Entities.Add(new Entity(initialStructure, data));
         }
     }
 }

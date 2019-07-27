@@ -58,6 +58,7 @@ namespace EvolutionalNeuralNetwork
             Dendrites = new Dictionary<Neuron, double>();
             Connections = new List<Neuron>();
             Axon = 0;
+            Recovery = 1;
 
             parentCluster = _parentCluster;
             rand = _rand;
@@ -73,10 +74,12 @@ namespace EvolutionalNeuralNetwork
                 return true;
             }
 
+            // send this to gpu
             double signal = Bias;
             
             foreach (var den in Dendrites)
                 signal += den.Key.Axon * den.Value;
+            //
 
             return Activate(signal);
         }
@@ -94,17 +97,23 @@ namespace EvolutionalNeuralNetwork
             return false;
         }
 
+        //  Either an IO neuron or the IO reference neuron
+        public bool IsImmutable()
+        {
+            return Dendrites.Keys.Any(k => k.Identifier == Cluster.InputGuid) ||
+                   Connections.Any(s => s.Identifier == Cluster.OutputGuid) ||
+                   Identifier == Cluster.InputGuid ||
+                   Identifier == Cluster.OutputGuid;
+        }
+
         public void Mutate()
         {
             double chance = rand.NextDouble();
             if (chance > MutationRate)
                 return;
 
-            // Neurons connectind to the input/output refference should never mutate
-            if (Dendrites.Keys.Any(k => k.Identifier == Cluster.InputGuid) ||
-                Connections.Any(s => s.Identifier == Cluster.OutputGuid) ||
-                Identifier == Cluster.InputGuid ||
-                Identifier == Cluster.OutputGuid)
+            // Neurons connectind to the input/output reference should never mutate
+            if (IsImmutable())
                 return;
 
             int index;

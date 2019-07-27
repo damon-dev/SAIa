@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
@@ -126,7 +124,7 @@ namespace EvolutionalNeuralNetwork
 
             foreach(var guid in neurons.Keys)
             {
-                if (guid == InputGuid || guid == OutputGuid) continue;
+                if (neurons[guid].IsImmutable()) continue;
 
                 structure.Add((BiasMark, guid, neurons[guid].Bias));
                 structure.Add((RecoveryMark, guid, neurons[guid].Recovery));
@@ -177,45 +175,30 @@ namespace EvolutionalNeuralNetwork
         /// <returns>True if the graph has a cycle, false if the graph is a tree.</returns>
         private TimeSpan Propagate(List<double> inputs)
         {
-            //var newQueue = new ConcurrentQueue<Neuron>();
-            //ConcurrentQueue<Neuron> oldQueue;
             var timeStamp = DateTime.UtcNow;
-            //var gpu = Gpu.Default;
             var queue = new Queue<Neuron>();
 
             // baking the inputs into the input neuron axons
             for (int i = 0; i < neurons[InputGuid].Connections.Count; ++i)
-            //Parallel.For(0, neurons[InputGuid].Connections.Count, (i) =>
             {
                 var inputNeuron = neurons[InputGuid].Connections[i];
 
                 inputNeuron.Fire(inputs[i]);
 
                 foreach (var successor in inputNeuron.Connections)
-                    //newQueue.Enqueue(successor);
                     queue.Enqueue(successor);
-            }//);
-            
-            //while (newQueue.Count > 0)
+            }
+
             while (queue.Count > 0)
             {
-                //oldQueue = newQueue;
-                //newQueue = new ConcurrentQueue<Neuron>();
-                //int count = oldQueue.Count;
-
-                //Parallel.For(0, count, (i) =>
-                //{
-                    //oldQueue.TryDequeue(out Neuron current);
-                    var current = queue.Dequeue();
-                    if (current.Fire() == true)
+                var current = queue.Dequeue();
+                if (current.Fire())
+                {
+                    foreach (var successor in current.Connections)
                     {
-                        foreach (var successor in current.Connections)
-                        {
-                        //newQueue.Enqueue(successor);
-                            queue.Enqueue(successor);
-                        }
+                        queue.Enqueue(successor);
                     }
-                //});
+                }
             }
 
             return DateTime.UtcNow - timeStamp;

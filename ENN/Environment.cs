@@ -51,11 +51,12 @@ namespace EvolutionalNeuralNetwork
             return Run();
         }
 
-        public void Stop()
+        public void Stop(bool save)
         {
             isRunning = false;
 
-            data.SaveCulture(culture);
+            if (save)
+                data.SaveCulture(culture);
 
             for(int i = observers.Count - 1; i >= 0; --i)
                 observers[i].OnCompleted();

@@ -61,15 +61,15 @@ namespace EvolutionalNeuralNetwork
                         break;
 
                     case Response.Stop:
-                        environment.Stop();
+                        environment.Stop(true);
                         break;
 
                     default:
                         break;
                 }
             }
-            
-            environment.Stop();
+
+            environment.Stop(false);
         }
 
         public void OnCompleted()
