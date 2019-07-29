@@ -112,18 +112,18 @@ namespace EvolutionalNeuralNetwork
             while (m < motherGenes.Count)
             {
                 var gene = motherGenes[m++];
-                gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand); // halving them to make them closer to 0, as if the value in the other parent is 0
+                //gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand); // halving them to make them closer to 0, as if the value in the other parent is 0
                 motherUniqueStructure.Add(gene);
             }
 
             while (f < fatherGenes.Count)
             {
                 var gene = fatherGenes[f++];
-                gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
+                //gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
                 fatherUniqueStructure.Add(gene);
             }
 
-            switch (rand.Next(0, 3))
+            switch (rand.Next(0, 4))
             {
                 case 0: // more like mother
                     baby = new Entity(commonStructure, mother.dataSource);
@@ -140,15 +140,41 @@ namespace EvolutionalNeuralNetwork
                         }
                     }
 
-                    baby.Genes.AddRange(motherUniqueStructure);
+                    for (int i = 0; i < motherUniqueStructure.Count; ++i)
+                    {
+                        var gene = motherUniqueStructure[i];
+                        gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
+                        baby.Genes.Add(gene);
+                    }
+
+                    for (int i = 0; i < fatherUniqueStructure.Count; ++i)
+                    {
+                        var gene = fatherUniqueStructure[i];
+                        gene.Strength /= 2;
+                        gene.Strength -= CalculateOffset(gene.Strength, 0, rand);
+                        baby.Genes.Add(gene);
+                    }
 
                     return baby;
 
                 case 1: // similar to both
                     baby = new Entity(commonStructure, mother.dataSource);
 
-                    baby.Genes.AddRange(motherUniqueStructure);
-                    baby.Genes.AddRange(fatherUniqueStructure);
+                    for (int i = 0; i < motherUniqueStructure.Count; ++i)
+                    {
+                        var gene = motherUniqueStructure[i]; 
+                        gene.Strength /= 2;
+                        gene.Strength -= CalculateOffset(gene.Strength, 0, rand);
+                        baby.Genes.Add(gene);
+                    }
+
+                    for (int i = 0; i < fatherUniqueStructure.Count; ++i)
+                    {
+                        var gene = fatherUniqueStructure[i];
+                        gene.Strength /= 2;
+                        gene.Strength -= CalculateOffset(gene.Strength, 0, rand);
+                        baby.Genes.Add(gene);
+                    }
 
                     return baby;
 
@@ -167,7 +193,25 @@ namespace EvolutionalNeuralNetwork
                         }
                     }
 
-                    baby.Genes.AddRange(fatherUniqueStructure);
+                    for (int i = 0; i < motherUniqueStructure.Count; ++i)
+                    {
+                        var gene = motherUniqueStructure[i];
+                        gene.Strength /= 2;
+                        gene.Strength -= CalculateOffset(gene.Strength, 0, rand);
+                        baby.Genes.Add(gene);
+                    }
+
+                    for (int i = 0; i < fatherUniqueStructure.Count; ++i)
+                    {
+                        var gene = fatherUniqueStructure[i];
+                        gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
+                        baby.Genes.Add(gene);
+                    }
+
+                    return baby;
+
+                case 3: // only similar to both
+                    baby = new Entity(commonStructure, mother.dataSource);
 
                     return baby;
 

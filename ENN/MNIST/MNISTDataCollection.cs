@@ -86,6 +86,7 @@ namespace EvolutionalNeuralNetwork.MNIST
 
         private List<double> ProcessLabel(byte label)
         {
+            /*
             var list = new List<double>();
 
             for (int i = 0; i < 10; ++i)
@@ -96,7 +97,11 @@ namespace EvolutionalNeuralNetwork.MNIST
                     list.Add(0);
             }
 
+
             return list;
+            */
+
+            return new List<double> { (double)label / 10 };
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace EvolutionalNeuralNetwork
 {
-    public enum Response { Quit, Load, Train, Stop }
+    public enum Response { Quit, Load, Train, Stop, Ignore }
 
     public class DisplayProtocol
     {
@@ -54,7 +54,7 @@ namespace EvolutionalNeuralNetwork
 
                 default:
 
-                    return Response.Quit;
+                    return Response.Ignore;
             }
         }
     }

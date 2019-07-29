@@ -28,7 +28,7 @@ namespace EvolutionalNeuralNetwork.MNIST
             {
                 var preditcedOutput = cluster.Querry(input[i], out TimeSpan time);
                 cluster.Nap();
-
+                /*
                 int position = 0;
                 double maxim = preditcedOutput[0];
                 for (int k = 1; k < preditcedOutput.Count; ++k)
@@ -57,6 +57,11 @@ namespace EvolutionalNeuralNetwork.MNIST
                         }
                     }
                 }
+                */
+                if (Math.Abs(preditcedOutput[0] - expectedOutput[i][0]) < 0.05)
+                    goodHits[(int)(expectedOutput[i][0] * 10)]++;
+
+                totalHits[(int)(expectedOutput[i][0] * 10)]++;
 
                 totalTime += time.TotalSeconds;
             }

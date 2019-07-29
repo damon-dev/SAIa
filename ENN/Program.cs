@@ -17,8 +17,8 @@ namespace EvolutionalNeuralNetwork
             var program = new Program();
             var environment = new Environment();
 
-            var data = new MNISTDataCollection();
-            var displayProtocol = new MNISTDisplayProtocol(data);
+            var data = new XORDataCollection();
+            var displayProtocol = new XORDisplayProtocol(data);
 
             program.stopper = environment.Subscribe(program);
 
