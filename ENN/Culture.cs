@@ -1,92 +1,157 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
+    public enum Mode { Grow, Balance, Shrink }
+
     public class Culture
     {
-        public List<Entity> Entities { get; set; }
-        public int Size { get; set; } = 500;
-        public int TournamentSize { get; set; } = 10;
+        private List<Entity> entities;
+        private readonly int borderStart;
+        private readonly int borderEnd;
+        private readonly int tournamentSize;
+        private const double mutationRate = 0.02;
+        private Task<Entity> overlord;
 
-        public Culture(DataCollection data, List<Entity> entities = null)
+        public Culture(List<Entity> _entities, DataCollection _data, int _borderStart, int _borderEnd, int _tournamentSize)
         {
-            if (entities == null)
-                GenerateMembers(data.InputWidth, data.OutputWidth, data);
-            else
-            {
-                Entities = entities;
-                Size = Entities.Count;
-            }
+            entities = _entities;
+            borderStart = _borderStart;
+            borderEnd = _borderEnd;
+            tournamentSize = _tournamentSize;
         }
 
-        public int Tournament(Entity mate, Random rand)
+        private int Tournament(Entity mate, int mateIndex, Random rand)
         {
-            int position = 0;
-            Entity bestMate = null;
-            double bestFitnes = double.MinValue;
+            int position = -1;
+            double bestFitnes = double.MaxValue;
+            int alrightPosition = -1;
+            double alrightFitness = double.MaxValue;
 
-            for (int i = 0; i < TournamentSize; ++i)
+            for (int i = 0; i < tournamentSize; ++i)
             {
-                int index = rand.Next(0, Entities.Count);
-                if (Entities[index].FitnessValue > bestFitnes && !Entities[index].Equals(mate))
+                int index = rand.Next(borderStart, borderEnd);
+                while(index == mateIndex)
+                    index = rand.Next(borderStart, borderEnd);
+
+                if (entities[index].FitnessValue < bestFitnes &&
+                    mate.Compatible(entities[index]))
                 {
-                    bestMate = Entities[index];
-                    bestFitnes = bestMate.FitnessValue;
+                    bestFitnes = entities[index].FitnessValue;
                     position = index;
                 }
+                else if (entities[index].FitnessValue < alrightFitness)
+                {
+                    alrightFitness = entities[index].FitnessValue;
+                    alrightPosition = index;
+                }
+            }
+
+            if (position == -1)
+            {
+                position = rand.Next(entities.Count);
+                while (position == mateIndex)
+                    position = rand.Next(entities.Count);
+
+                if (entities[position].FitnessValue > alrightFitness)
+                    position = alrightPosition;
             }
 
             return position;
         }
 
-        public int Victim(Random rand)
+        private int Prey(Entity hunter, Entity parent, int parentIndex, Random rand)
         {
-            int position = 0;
-            Entity weakestPrey = null;
-            double worstFitness = double.MaxValue;
+            if (hunter.FitnessValue < entities[borderStart].FitnessValue)
+                return borderStart;
 
-            for (int i = 0; i < TournamentSize * 2; ++i)
+            int position = -1;
+            double worstFitness = hunter.FitnessValue;
+
+            for (int i = 0; i < tournamentSize; ++i)
             {
-                int index = rand.Next(1, Entities.Count);
-                if (Entities[index].FitnessValue < worstFitness)
+                int index = rand.Next(borderStart, borderEnd);
+                while (index == parentIndex)
+                    index = rand.Next(borderStart, borderEnd);
+
+                if (entities[index].FitnessValue > hunter.FitnessValue &&
+                    !hunter.Compatible(entities[index]))
                 {
-                    weakestPrey = Entities[index];
-                    worstFitness = weakestPrey.FitnessValue;
+                    position = index;
+                    break;
+                }
+                else if (entities[index].FitnessValue > worstFitness)
+                {
+                    worstFitness = entities[index].FitnessValue;
                     position = index;
                 }
+            }
+
+            if (position == -1 && parentIndex != borderStart)
+            {
+                if (entities[parentIndex].Equals(parent) ||
+                    hunter.FitnessValue < entities[parentIndex].FitnessValue)
+                    position = parentIndex;
+            }
+
+            if (position == -1)
+            {
+                int index = rand.Next(entities.Count);
+                if (hunter.FitnessValue < entities[index].FitnessValue)
+                    position = index;
             }
 
             return position;
         }
 
-        private void GenerateMembers(int inputSize, int outputSize, DataCollection data)
+        public Task<Entity> Develop(Mode mode)
         {
-            var initialStructure = new List<Gene>();
-            var inputGuids = new List<Guid>();
-            var outputGuids = new List<Guid>();
-            var cluster = new Cluster(new Random());
+            if(overlord != null && !overlord.IsCompleted)
+                return overlord;
 
-            Entities = new List<Entity>();
+            overlord = Task.Run(() =>
+            {
+                int motherIndex, fatherIndex;
 
-            // Creating GUIDS for input neurons
-            for (int i = 0; i < inputSize; ++i)
-                inputGuids.Add(Guid.NewGuid());
+                Entity mother = null;
+                Entity father = null;
 
-            // Creating GUIDS for output neurons
-            for (int i = 0; i < outputSize; ++i)
-                outputGuids.Add(Guid.NewGuid());
+                var rand = new Random();
 
-            // Linking input neurons to the reference node and the seed node
-            foreach (var iGuid in inputGuids)
-                initialStructure.Add((Cluster.InputGuid, iGuid, 0));
+                fatherIndex = rand.Next(borderStart, borderEnd);
+                father = entities[fatherIndex];
 
-            // Linking output neurons to the reference node and the seed node
-            foreach (var oGuid in outputGuids)
-                initialStructure.Add((oGuid, Cluster.OutputGuid, 0));
+                motherIndex = Tournament(father, fatherIndex, rand);
+                mother = entities[motherIndex];
 
-            for (int i = 0; i < Size; ++i)
-                Entities.Add(new Entity(initialStructure, data));
+                var kids = mother.Copulate(father, mode, rand);
+
+                Parallel.ForEach(kids, (c) =>
+                {
+                    c.EvaluateFitness(mode, mutationRate, new Random());
+                });
+
+                Entity child = null;
+                double bestFitness = double.MaxValue;
+                foreach(var c in kids)
+                {
+                    if (c.FitnessValue < bestFitness)
+                    {
+                        bestFitness = c.FitnessValue;
+                        child = c;
+                    }
+                }
+
+                int prey = Prey(child, father, fatherIndex, rand);
+                if (prey != -1)
+                    entities[prey] = child;
+
+                return entities[borderStart];
+            });
+
+            return overlord;
         }
     }
 }

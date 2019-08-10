@@ -8,11 +8,16 @@ namespace EvolutionalNeuralNetwork
     /// </summary>
     /// 
     [Serializable]
-    public struct Gene : IComparable<Gene>, ISerializable
+    public struct Gene : IComparable<Gene>, IEquatable<Gene> ,ISerializable
     {
         public Guid Source { get; set; }
         public Guid Destination { get; set; }
         public double Strength { get; set; }
+
+        public bool Equals(Gene other)
+        {
+            return Source.Equals(other.Source) && Destination.Equals(other.Destination);
+        }
 
         public int CompareTo(Gene other)
         {

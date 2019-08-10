@@ -12,6 +12,10 @@ namespace EvolutionalNeuralNetwork
         public static readonly Guid RecoveryMark = new Guid("39414500-9063-470d-8ce3-744a15bbc0ff");
 
         public List<Gene> Structure { get; private set; }
+        public int SynapseCount { get; private set; }
+        public int InputSize => neurons[InputGuid].Connections.Count;
+        public int OutputSize => neurons[OutputGuid].Dendrites.Count;
+        public int NeuronCount => neuronGuids.Count - InputSize - OutputSize;
 
         private List<Guid> neuronGuids;
         private Dictionary<Guid, Neuron> neurons;
@@ -31,9 +35,9 @@ namespace EvolutionalNeuralNetwork
             return rand.NextDouble() * 2 - 1;
         }
 
-        public List<double> Querry(List<double> inputs, out TimeSpan time)
+        public List<double> Querry(List<double> inputs, out int steps)
         {
-            time =  Propagate(inputs);
+            Propagate(inputs, out steps);
 
             var outputNeurons = new List<Gene>();
             var outputs = new List<double>();
@@ -60,9 +64,16 @@ namespace EvolutionalNeuralNetwork
                 neuron.Fire(0);
         }
 
-        public List<Gene> GenerateFromStructure(List<Gene> structure, bool allowMutation = false)
+        // No mutation
+        public List<Gene> GenerateFromStructure(List<Gene> structure)
+        {
+            return GenerateFromStructure(structure, Mode.Balance, 0);
+        }
+
+        public List<Gene> GenerateFromStructure(List<Gene> structure, Mode mode, double mutationRate)
         {
             Structure = new List<Gene>(structure);
+            SynapseCount = 0;
 
             Structure.Sort(); // makes sure the inputs are created in a consistent order
 
@@ -94,23 +105,76 @@ namespace EvolutionalNeuralNetwork
                 else if (source == RecoveryMark)
                     neurons[dest].Recovery = strength;
                 else
-                    neurons[dest].CreateSynapse(neurons[source], strength);
+                {
+                    neurons[dest].ForceCreateDendrite(neurons[source], strength);
+                    SynapseCount++;
+                }
             }
 
-            if (RegisterNeuron(new Neuron(SeedGuid, this, rand)))
-            {
-                neurons[SeedGuid].Bias = RandomSynapseStrength();
-                neurons[SeedGuid].Recovery = Math.Abs(RandomSynapseStrength());
+            SynapseCount -= InputSize + OutputSize;
 
-                Structure = RecreateStructure();
-            }
-
-            if (allowMutation)
+            if (rand.NextDouble() < mutationRate && NeuronCount > 0)
             {
                 var list = new List<Guid>(neuronGuids);
+                double gr = (NeuronCount * 0.15 + 1) / NeuronCount;
+
+                var p = new MutationProbabilities();
+                switch (mode)
+                {
+                    case Mode.Grow:
+                        p = new MutationProbabilities
+                        {
+                            MutationRate = gr,
+                            NeuronCreation = .2,
+                            NeuronDeletion = .1,
+                            ConnectionAlteration = .3,
+                            ConnectionDeletion = .2,
+                            DendriteAlteration = .4,
+                            DendriteDeletion = .3,
+                            RandomWalk = .8,
+                            WalkErosion = 2,
+                            Bias = .2,
+                            Recovery = .1
+                        };
+                        break;
+
+                    case Mode.Balance:
+                        p = new MutationProbabilities
+                        {
+                            MutationRate = gr,
+                            NeuronCreation = .1,
+                            NeuronDeletion = .1,
+                            ConnectionAlteration = .2,
+                            ConnectionDeletion = .2,
+                            DendriteAlteration = .3,
+                            DendriteDeletion = .3,
+                            RandomWalk = .6,
+                            WalkErosion = 3,
+                            Bias = .2,
+                            Recovery = .1
+                        };
+                        break;
+
+                    case Mode.Shrink:
+                        p = new MutationProbabilities
+                        {
+                            MutationRate = gr,
+                            NeuronCreation = .1,
+                            NeuronDeletion = .2,
+                            ConnectionAlteration = .2,
+                            ConnectionDeletion = .3,
+                            DendriteAlteration = .3,
+                            DendriteDeletion = .4,
+                            RandomWalk = 1,
+                            WalkErosion = 10,
+                            Bias = .2,
+                            Recovery = .1
+                        };
+                        break;
+                }
 
                 foreach (var guid in list)
-                    neurons[guid].Mutate();
+                    neurons[guid].Mutate(p);
 
                 Structure = RecreateStructure();
             }
@@ -121,6 +185,7 @@ namespace EvolutionalNeuralNetwork
         public List<Gene> RecreateStructure()
         {
             var structure = new List<Gene>();
+            SynapseCount = 0;
 
             foreach(var guid in neurons.Keys)
             {
@@ -130,9 +195,15 @@ namespace EvolutionalNeuralNetwork
                 structure.Add((RecoveryMark, guid, neurons[guid].Recovery));
             }
 
-            foreach(var dest in neurons.Keys)
-                foreach(var source in neurons[dest].Dendrites)
+            foreach (var dest in neurons.Keys)
+                foreach (var source in neurons[dest].Dendrites)
+                {
+                    SynapseCount++;
                     structure.Add((source.Key.Identifier, dest, source.Value));
+                }
+
+            SynapseCount -= InputSize + OutputSize;
+            structure.Sort();
 
             return structure;
         }
@@ -173,10 +244,10 @@ namespace EvolutionalNeuralNetwork
         /// Fires all neurons in the cluster BFS style.
         /// </summary>
         /// <returns>True if the graph has a cycle, false if the graph is a tree.</returns>
-        private TimeSpan Propagate(List<double> inputs)
+        private void Propagate(List<double> inputs, out int steps)
         {
-            var timeStamp = DateTime.UtcNow;
             var queue = new Queue<Neuron>();
+            steps = 0;
 
             // baking the inputs into the input neuron axons
             for (int i = 0; i < neurons[InputGuid].Connections.Count; ++i)
@@ -186,7 +257,9 @@ namespace EvolutionalNeuralNetwork
                 inputNeuron.Fire(inputs[i]);
 
                 foreach (var successor in inputNeuron.Connections)
+                {
                     queue.Enqueue(successor);
+                }
             }
 
             while (queue.Count > 0)
@@ -194,14 +267,19 @@ namespace EvolutionalNeuralNetwork
                 var current = queue.Dequeue();
                 if (current.Fire())
                 {
+                    steps++;
+                    Neuron mem = null;
                     foreach (var successor in current.Connections)
                     {
-                        queue.Enqueue(successor);
+                        if (successor.Equals(current))
+                            mem = successor;
+                        else
+                            queue.Enqueue(successor);
                     }
+                    if (mem != null)
+                        queue.Enqueue(mem);
                 }
             }
-
-            return DateTime.UtcNow - timeStamp;
         }
     }
 }

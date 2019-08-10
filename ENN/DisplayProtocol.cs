@@ -10,9 +10,14 @@ namespace EvolutionalNeuralNetwork
         protected List<List<double>> input;
         protected List<List<double>> expectedOutput;
 
-        public virtual void Display(List<Gene> structure)
+        public DisplayProtocol()
         {
-            if (structure == null)
+            Console.CursorVisible = false;
+        }
+
+        public virtual void Display(Entity champion)
+        {
+            if (champion == null)
             {
                 Console.WriteLine("T: Train L: Load S: Stop Q: Quit");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
@@ -20,6 +25,7 @@ namespace EvolutionalNeuralNetwork
             else
             {
                 Console.WriteLine("T: Train S: Stop Q: Quit        ");
+                Console.WriteLine($"Last updated: {DateTime.Now.ToLocalTime()}");
             }
         }
 
@@ -40,7 +46,7 @@ namespace EvolutionalNeuralNetwork
 
                     return Response.Load;
 
-                // Play
+                // Train
                 case 't':
                 case 'T':
 

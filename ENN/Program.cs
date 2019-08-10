@@ -1,63 +1,52 @@
-﻿using EvolutionalNeuralNetwork.MNIST;
-using EvolutionalNeuralNetwork.XOR;
+﻿using EvolutionalNeuralNetwork.XOR;
+using EvolutionalNeuralNetwork.MNIST;
 using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork
 {
-    class Program : IObserver<List<Gene>>
+    class Program : IObserver<Entity>
     {
-        private const int threadCount = 5;
+        private const int threadCount = 4;
+        private const int size = 50;
         private IDisposable stopper;
-        private List<Gene> currentStructure;
+        private Entity currentChampion;
+        private MNISTDisplayProtocol displayProtocol;
 
         static void Main(string[] args)
         {
             var program = new Program();
-            var environment = new Environment();
-
-            var data = new XORDataCollection();
-            var displayProtocol = new XORDisplayProtocol(data);
+            var data = new MNISTDataCollection();
+            program.displayProtocol = new MNISTDisplayProtocol(data);
+            var environment = new Environment(data);
 
             program.stopper = environment.Subscribe(program);
 
-            displayProtocol.Display(null);
+            program.displayProtocol.Display(null);
 
-            switch(displayProtocol.ReadResponse())
+            switch(program.displayProtocol.ReadResponse())
             {
                 case Response.Load:
-                    environment.Start(data, true, threadCount);
+                    environment.Populate(true, threadCount, size);
+                    environment.Start();
                     break;
 
                 case Response.Train:
-                    environment.Start(data, false, threadCount);
+                    environment.Populate(false, threadCount, size);
+                    environment.Start();
                     break;
-
-                case Response.Quit:
-                    return;
 
                 default:
                     return;
             }
 
-            var displayTask = Task.Run(async () =>
-            {
-                while (true)
-                {
-                    await Task.Delay(1000);
-                    displayProtocol.Display(program.currentStructure);
-                }
-            });
-
             Response response;
-            while((response = displayProtocol.ReadResponse()) != Response.Quit)
+            while((response = program.displayProtocol.ReadResponse()) != Response.Quit)
             {
                 switch (response)
                 {
                     case Response.Train:
                         program.stopper = environment.Subscribe(program);
-                        environment.Start(data, true, threadCount);
+                        environment.Start();
                         break;
 
                     case Response.Stop:
@@ -81,10 +70,14 @@ namespace EvolutionalNeuralNetwork
         {
         }
 
-        public void OnNext(List<Gene> structure)
+        public void OnNext(Entity entity)
         {
-            if (!structure.Equals(currentStructure))
-                currentStructure = structure;
+            if (currentChampion == null ||
+                entity.FitnessValue < currentChampion.FitnessValue)
+            {
+                currentChampion = entity;
+                displayProtocol.Display(entity);
+            }
         }
     }
 }

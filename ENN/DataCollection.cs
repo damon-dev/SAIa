@@ -26,7 +26,7 @@ namespace EvolutionalNeuralNetwork
             TestOutput = new List<List<double>>();
         }
 
-        public virtual void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count)
+        public virtual void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count, bool random)
         {
             input = TrainingInput.Take(count).ToList();
             output = TrainingOutput.Take(count).ToList();
@@ -38,39 +38,42 @@ namespace EvolutionalNeuralNetwork
             output = TestOutput.Take(count).ToList();
         }
 
-        public bool LoadCulture(out Culture culture)
+        public bool LoadEntities(out List<Entity> entities, int count = 0)
         {
             try
             {
-                CultureContainer container = null;
+                EntityContainer container = null;
 
                 // deserialize JSON directly from a file
                 using (var file = File.OpenText(genealogyPath))
                 {
                     var serializer = new JsonSerializer();
-                    container = (CultureContainer)serializer.Deserialize(file, typeof(CultureContainer));
+                    container = (EntityContainer)serializer.Deserialize(file, typeof(EntityContainer));
                 }
 
-                var entities = container.Entities.Select(e => new Entity(e.Genes, this, e.FitnessValue)).ToList();
-                culture = new Culture(this, entities);
+                if (count <= 0 || count > container.Entities.Length)
+                    count =  container.Entities.Length;
 
+                entities = container.Entities.Select(e => new Entity(e.Genes, this, e.FitnessValue))
+                                                 .Take(count)
+                                                 .ToList();
                 return true;
             }
             catch (Exception)
             {
-                culture = null;
+                entities = null;
                 return false;
             }
         }
 
-        public bool SaveCulture(Culture culture)
+        public bool SaveEntities(List<Entity> entities)
         {
             try
             {
-                if (culture == null) return false;
-                culture.Entities.ForEach(e => e.Genes.Sort());
+                if (entities == null) return false;
 
-                var container = new CultureContainer(culture.Entities);
+                var container = new EntityContainer(entities);
+
                 Directory.CreateDirectory("Geneaology");
                 // serialize JSON directly to a file
                 using (var file = File.CreateText(genealogyPath))
@@ -91,11 +94,11 @@ namespace EvolutionalNeuralNetwork
         }
     }
 
-    class CultureContainer
+    class EntityContainer
     {
         public Entity[] Entities;
 
-        public CultureContainer(List<Entity> list)
+        public EntityContainer(List<Entity> list)
         {
             Entities = list?.ToArray();
         }

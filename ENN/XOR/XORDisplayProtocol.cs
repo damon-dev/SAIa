@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace EvolutionalNeuralNetwork.XOR
 {
@@ -7,33 +8,34 @@ namespace EvolutionalNeuralNetwork.XOR
     {
         public XORDisplayProtocol(XORDataCollection data)
         {
-            data.FetchTrainingData(out input, out expectedOutput, 4);
+            data.FetchTrainingData(out input, out expectedOutput, 4, false);
         }
 
-        public override void Display(List<Gene> structure)
+        public override void Display(Entity champion)
         {
-            base.Display(structure);
+            base.Display(champion);
 
-            if (structure == null) return;
+            if (champion == null) return;
 
             var cluster = new Cluster(new Random());
-            cluster.GenerateFromStructure(structure);
+            cluster.GenerateFromStructure(champion.Genes);
 
-            double totalTime = 0;
+            double totalSteps = 0;
 
             for (int i = 0; i < input.Count; i++)
             {
-                var preditcedOutput = cluster.Querry(input[i], out TimeSpan time);
+                var preditcedOutput = cluster.Querry(input[i], out int steps);
                 cluster.Nap();
 
                 Console.WriteLine($"{input[i][0]} ^ {input[i][1]} = {preditcedOutput[0]:0.00000}");
-                totalTime += time.TotalSeconds;
+                totalSteps += steps;
             }
 
-            totalTime /= input.Count;
+            totalSteps /= input.Count;
 
-            Console.WriteLine($"Average time: {totalTime:0.00000}");
-            Console.SetCursorPosition(0, Console.CursorTop - input.Count - 2);
+            Console.WriteLine($"Fitness: {champion.FitnessValue:0.00}    ");
+            Console.WriteLine($"Steps: {totalSteps:0.00}      ");
+            Console.SetCursorPosition(0, Console.CursorTop - input.Count - 4);
         }
     }
 }

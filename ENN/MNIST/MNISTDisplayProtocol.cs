@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace EvolutionalNeuralNetwork.MNIST
@@ -8,71 +7,43 @@ namespace EvolutionalNeuralNetwork.MNIST
     {
         public MNISTDisplayProtocol(MNISTDataCollection data)
         {
-            data.FetchTestData(out input, out expectedOutput, 0);
+            //data.FetchTestData(out input, out expectedOutput, 0);
+            data.FetchTrainingData(out input, out expectedOutput, 100, false);
         }
 
-        public override void Display(List<Gene> structure)
+        public override void Display(Entity champion)
         {
-            base.Display(structure);
+            base.Display(champion);
 
-            if (structure == null) return;
+            if (champion == null) return;
 
             var cluster = new Cluster(new Random());
-            cluster.GenerateFromStructure(structure);
+            cluster.GenerateFromStructure(champion.Genes);
 
-            double totalTime = 0;
-            var goodHits = new double[10];
-            var totalHits = new int[10];
+            double totalSteps = 0;
+            double[] errorRate = new double[10];
 
             for (int i = 0; i < input.Count; i++)
             {
-                var preditcedOutput = cluster.Querry(input[i], out TimeSpan time);
+                var preditcedOutput = cluster.Querry(input[i], out int steps);
                 cluster.Nap();
-                /*
-                int position = 0;
-                double maxim = preditcedOutput[0];
-                for (int k = 1; k < preditcedOutput.Count; ++k)
-                {
-                    if (preditcedOutput[k] > maxim)
-                    {
-                        maxim = preditcedOutput[k];
-                        position = k;
-                    }
-                }
+                errorRate[(int)(expectedOutput[i][0] * 10)] += (preditcedOutput[0] - expectedOutput[i][0]) * (preditcedOutput[0] - expectedOutput[i][0]);
 
-                if (expectedOutput[i][position] == 1 && preditcedOutput[position] > 0)
-                {
-                    goodHits[position]++;
-                    totalHits[position]++;
-                }
-                else
-                {
-                    for (int k = 0; k < expectedOutput[i].Count; ++k)
-                    {
-                        if (expectedOutput[i][k] == 1)
-                        {
-
-                            totalHits[k]++;
-                            break;
-                        }
-                    }
-                }
-                */
-                if (Math.Abs(preditcedOutput[0] - expectedOutput[i][0]) < 0.05)
-                    goodHits[(int)(expectedOutput[i][0] * 10)]++;
-
-                totalHits[(int)(expectedOutput[i][0] * 10)]++;
-
-                totalTime += time.TotalSeconds;
+                totalSteps += steps;
             }
 
-            totalTime /= input.Count;
+            totalSteps /= input.Count;
 
             for (int i = 0; i < 10; ++i)
-                Console.WriteLine($"{i} : {goodHits[i] / totalHits[i]:0.00}");
+            {
+                errorRate[i] /= 10;
+                Console.WriteLine($"{i} : {errorRate[i]:0.0000}");
+            }
 
-            Console.WriteLine($"Average time: {totalTime:0.00000}");
-            Console.SetCursorPosition(0, Console.CursorTop - 12);
+            Console.WriteLine($"Mean error: {(errorRate.Sum() / 10):0.0000}    ");
+            Console.WriteLine($"Fitness: {champion.FitnessValue:0.00}    ");
+            Console.WriteLine($"Average steps: {totalSteps:0.00}    ");
+            Console.SetCursorPosition(0, Console.CursorTop - 15);
         }
     }
 }

@@ -4,10 +4,23 @@ using System.Linq;
 
 namespace EvolutionalNeuralNetwork
 {
+    public struct MutationProbabilities
+    {
+        public double MutationRate { get; set; }
+        public double NeuronCreation { get; set; }
+        public double NeuronDeletion { get; set; } 
+        public double DendriteAlteration { get; set; } 
+        public double DendriteDeletion { get; set; } 
+        public double ConnectionAlteration { get; set; }
+        public double ConnectionDeletion { get; set; }
+        public double RandomWalk { get; set; }
+        public double WalkErosion { get; set; }
+        public double Bias { get; set; }
+        public double Recovery { get; set; }
+    }
+
     public class Neuron
     {
-        public const double MutationRate = 0.01;
-
         public Guid Identifier { get; private set; }
         public DateTime LastFired { get; private set; }
         public double Signal { get; private set; }
@@ -106,88 +119,148 @@ namespace EvolutionalNeuralNetwork
                    Identifier == Cluster.OutputGuid;
         }
 
-        public void Mutate()
+        public void Mutate(MutationProbabilities p)
         {
             double chance = rand.NextDouble();
-            if (chance > MutationRate)
+            if (chance > p.MutationRate)
                 return;
 
             // Neurons connectind to the input/output reference should never mutate
             if (IsImmutable())
                 return;
 
-            int index;
-
-            int percent = rand.Next(0, 100);
-            if (percent < 10)
+            double percent = rand.NextDouble();
+            if (percent < p.NeuronDeletion)
             {
                 // remove neuron
                 RemoveNeuron();
                 return;
             }
 
-            percent = rand.Next(0, 100);
-            if (percent < 10)
+            percent = rand.NextDouble();
+            if (percent < p.NeuronCreation)
             {   // new neuron
-                CreateClone();
+                CreateNeuron();
             }
 
-            percent = rand.Next(0, 100);
-            if (percent < 30)
-            {   // remove dendrite
-                if (Dendrites.Keys.Count > 0)
+            percent = rand.NextDouble();
+            if (percent < p.DendriteDeletion)
+            {
+                RemoveDendrite(RandomDendrite(this));
+            }
+
+            percent = rand.NextDouble();
+            if (percent < p.ConnectionDeletion)
+            {
+                RandomConnection(this)?.RemoveDendrite(this);
+            }
+
+            percent = rand.NextDouble();
+            if (percent < p.DendriteAlteration)
+            {
+                double walkP = p.RandomWalk;
+                Neuron neuron;
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // alters an existing dendrite
                 {
-                    var dendrites = Dendrites.Keys.ToList();
-                    index = rand.Next(0, dendrites.Count);
-                    RemoveSynapse(dendrites[index]);
+                    neuron = RandomDendrite(this);
+                    if (neuron != null) Dendrites[neuron] = parentCluster.RandomSynapseStrength();
+                    walkP /= p.WalkErosion;
+                }
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates dendrite on an existing dendrite level
+                {
+                    neuron = RandomStepUp(this, 1);
+                    if (neuron != null) CreateDendrite(neuron, parentCluster.RandomSynapseStrength());
+                    walkP /= p.WalkErosion;
+                }
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates dendrite on same level as this neuron
+                {
+                    neuron = RandomStepUp(this, 0);
+                    if (neuron != null) CreateDendrite(neuron, parentCluster.RandomSynapseStrength());
+                    walkP /= p.WalkErosion;
+                }
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates dendrite on an existing connection level
+                {
+                    neuron = RandomStepDown(this, 1);
+                    if (neuron != null) CreateDendrite(neuron, parentCluster.RandomSynapseStrength());
+                    walkP /= p.WalkErosion;
+                }
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates dendrite to a random neuron
+                {
+                    neuron = parentCluster.RandomNeuron();
+                    CreateDendrite(neuron, parentCluster.RandomSynapseStrength());
                 }
             }
 
-            percent = rand.Next(0, 100);
-            if (percent < 30)
-            {   // remove synapse
-                if (Connections.Count > 0)
+            percent = rand.NextDouble();
+            if (percent < p.ConnectionAlteration)
+            {
+                double walkP = p.RandomWalk;
+                Neuron neuron;
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // alters an existing connection
                 {
-                    index = rand.Next(0, Connections.Count);
-                    Connections[index].RemoveSynapse(this);
+                    neuron = RandomConnection(this);
+                    if (neuron != null) neuron.Dendrites[this] = parentCluster.RandomSynapseStrength();
+                    walkP /= p.WalkErosion;
+                }
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates connection on an existing connection level
+                {
+                    neuron = RandomStepDown(this, 1);
+                    neuron?.CreateDendrite(this, parentCluster.RandomSynapseStrength());
+                    walkP /= p.WalkErosion;
+                }
+
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates connection on same level as this neuron
+                {
+                    neuron = RandomStepDown(this, 0);
+                    neuron?.CreateDendrite(this, parentCluster.RandomSynapseStrength());
+                    walkP /= p.WalkErosion;
+                }
+                 
+                percent = rand.NextDouble();
+                if (percent < walkP) // creates connection on an existing dendrite level
+                {
+                    neuron = RandomStepUp(this, 1);
+                    neuron?.CreateDendrite(this, parentCluster.RandomSynapseStrength());
+                    walkP /= p.WalkErosion;
+                }
+                
+                if (percent < walkP)// creates connection to a random neuron
+                {
+                    neuron = parentCluster.RandomNeuron();
+                    neuron?.CreateDendrite(this, parentCluster.RandomSynapseStrength());
                 }
             }
 
-            percent = rand.Next(0, 100);
-            if (percent < 60)
-            {   // dendrite value change
-                index = rand.Next(0, Dendrites.Keys.Count + 1);
-
-                if (index == Dendrites.Keys.Count)
-                    Bias = parentCluster.RandomSynapseStrength();
-                else
-                {
-                    var dendrite = Dendrites.Keys.ElementAt(index);
-                    Dendrites[dendrite] = parentCluster.RandomSynapseStrength();
-                }
+            percent = rand.NextDouble();
+            if (percent < p.Bias)
+            {
+                // mutated bias
+                Bias = parentCluster.RandomSynapseStrength();
             }
 
-            percent = rand.Next(0, 100);
-            if (percent < 30)
-            {   // new dendrite
-                CreateSynapse(parentCluster.RandomNeuron(), parentCluster.RandomSynapseStrength());
-            }
-
-            percent = rand.Next(0, 100);
-            if (percent < 30)
-            {   // new synapse
-                parentCluster.RandomNeuron().CreateSynapse(this, parentCluster.RandomSynapseStrength());
-            }
-
-            percent = rand.Next(0, 100);
-            if (percent < 10)
+            percent = rand.NextDouble();
+            if (percent < p.Recovery)
             {
                 // mutated retention
                 Recovery = Math.Abs(parentCluster.RandomSynapseStrength());
             }
         }
 
-        public void CreateSynapse(Neuron origin, double strength)
+        public void ForceCreateDendrite(Neuron origin, double strength)
         {
             if (Dendrites.ContainsKey(origin))
                 Dendrites[origin] = strength;
@@ -198,7 +271,18 @@ namespace EvolutionalNeuralNetwork
             }
         }
 
-        public void RemoveSynapse(Neuron origin)
+        public void CreateDendrite(Neuron origin, double strength)
+        {
+            if (origin.Identifier == Cluster.InputGuid ||
+                origin.Identifier == Cluster.OutputGuid ||
+                this.Identifier == Cluster.InputGuid ||
+                this.Identifier == Cluster.OutputGuid)
+                return;
+
+            ForceCreateDendrite(origin, strength);
+        }
+
+        public void RemoveDendrite(Neuron origin)
         {
             if (origin != null && Dendrites.ContainsKey(origin))
             {
@@ -207,17 +291,24 @@ namespace EvolutionalNeuralNetwork
             }
         }
 
-        public void CreateClone()
+        public void CreateNeuron()
         {
             var neuron = new Neuron(Guid.NewGuid(), parentCluster, rand);
 
             if (parentCluster.RegisterNeuron(neuron))
             {
-                foreach (var den in Dendrites)
-                    neuron.CreateSynapse(den.Key, parentCluster.RandomSynapseStrength());
+                var sourceDendrite = RandomDendrite(this);
+                var topDendrite = RandomDendrite(sourceDendrite);
+                var destDendrite = RandomConnection(topDendrite);
 
-                foreach (var syn in Connections)
-                    syn.CreateSynapse(neuron, parentCluster.RandomSynapseStrength());
+                var sourceConnection = RandomConnection(this);
+                var bottomConnection = RandomConnection(sourceConnection);
+                var destConnection = RandomDendrite(bottomConnection);
+
+                if (destConnection == null || destDendrite == null) return;
+
+                neuron.CreateDendrite(destDendrite, Dendrites[sourceDendrite]);
+                destConnection.CreateDendrite(neuron, sourceConnection.Dendrites[this]);
             }
         }
 
@@ -226,11 +317,57 @@ namespace EvolutionalNeuralNetwork
             if (parentCluster.UnregisterNeuron(this))
             {
                 foreach (var den in Dendrites)
-                    den.Key.Connections.Remove(this);
+                {
 
-                foreach (var syn in Connections)
-                    syn.Dendrites.Remove(this);
+                    foreach (var con in Connections)
+                    {
+                        if (!((den.Key.IsImmutable() && con.IsImmutable()) ||
+                               den.Key.Equals(this) ||
+                               con.Equals(this) ||
+                               con.Dendrites.ContainsKey(den.Key)))
+                            con.CreateDendrite(den.Key, (den.Value + con.Dendrites[this]) / 2);
+                    }
+                    
+                    den.Key.Connections.Remove(this);
+                }
+
+                foreach (var con in Connections)
+                {
+                    con.Dendrites.Remove(this);
+                }
             }
+        }
+
+        private Neuron RandomDendrite(Neuron neuron)
+        {
+            if (neuron == null || neuron.Dendrites.Keys.Count == 0) return null;
+
+            var list = neuron.Dendrites.Keys.ToList();
+            return list[rand.Next(list.Count)];
+        }
+
+        private Neuron RandomConnection(Neuron neuron)
+        {
+            if (neuron == null || neuron.Connections.Count == 0) return null;
+
+            var list = neuron.Connections;
+            return list[rand.Next(list.Count)];
+        }
+
+        private Neuron RandomStepUp(Neuron neuron, int step)
+        {
+            if (step < 0)
+                return RandomConnection(neuron);
+
+            return RandomStepUp(RandomDendrite(neuron), step - 1);
+        }
+
+        private Neuron RandomStepDown(Neuron neuron, int step)
+        {
+            if (step < 0)
+                return RandomDendrite(neuron);
+
+            return RandomStepDown(RandomConnection(neuron), step - 1);
         }
     }
 }

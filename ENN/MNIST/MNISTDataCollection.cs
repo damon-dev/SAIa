@@ -31,7 +31,7 @@ namespace EvolutionalNeuralNetwork.MNIST
             OutputWidth = TrainingOutput[0].Count;
         }
 
-        public override void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count)
+        public override void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count, bool random)
         {
             input = new List<List<double>>();
             output = new List<List<double>>();
@@ -45,13 +45,20 @@ namespace EvolutionalNeuralNetwork.MNIST
             {
                 for (int i = 0; i < count / 10; ++i)
                 {
-                    int r = rand.Next(trainingKeep[k].Count);
-                    int index = trainingKeep[k][r];
-                    while (used.Contains(index))
+                    int index;
+                    if (random)
                     {
-                        r = rand.Next(trainingKeep[k].Count);
+                        int r = rand.Next(trainingKeep[k].Count);
                         index = trainingKeep[k][r];
+
+                        while (used.Contains(index))
+                        {
+                            r = rand.Next(trainingKeep[k].Count);
+                            index = trainingKeep[k][r];
+                        }
                     }
+                    else
+                        index = trainingKeep[k][i];
 
                     used.Add(index);
                     input.Add(TrainingInput[index]);
