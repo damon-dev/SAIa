@@ -60,9 +60,10 @@ namespace EvolutionalNeuralNetwork
             if (cluster.NeuronCount == 0)
                 FitnessValue = double.MaxValue;
             else
-                FitnessValue = input.Count * Math.Pow(Math.Log(meanSquareSum), 3) +
-                               (cluster.NeuronCount) /
-                               (double)(cluster.InputSize + cluster.OutputSize);
+                FitnessValue = input.Count * Math.Log(meanSquareSum) +// Math.Pow(Math.Log(meanSquareSum), 1) +
+                                                                      //(cluster.NeuronCount) /
+                                                                      //(double)(cluster.InputSize + cluster.OutputSize);
+                               cluster.NeuronCount + cluster.SynapseCount;
         }
 
         public bool Compatible(Entity mate)

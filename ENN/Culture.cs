@@ -8,11 +8,12 @@ namespace EvolutionalNeuralNetwork
 
     public class Culture
     {
+        public Entity Champion => entities[borderStart];
+
         private List<Entity> entities;
         private readonly int borderStart;
         private readonly int borderEnd;
         private readonly int tournamentSize;
-        private const double mutationRate = 0.02;
         private Task<Entity> overlord;
 
         public Culture(List<Entity> _entities, DataCollection _data, int _borderStart, int _borderEnd, int _tournamentSize)
@@ -64,6 +65,8 @@ namespace EvolutionalNeuralNetwork
 
         private int Prey(Entity hunter, Entity parent, int parentIndex, Random rand)
         {
+            if (hunter == null) return -1;
+
             if (hunter.FitnessValue < entities[borderStart].FitnessValue)
                 return borderStart;
 
@@ -106,7 +109,7 @@ namespace EvolutionalNeuralNetwork
             return position;
         }
 
-        public Task<Entity> Develop(Mode mode)
+        public Task<Entity> Develop(Mode mode, double mutationRate)
         {
             if(overlord != null && !overlord.IsCompleted)
                 return overlord;
@@ -119,9 +122,16 @@ namespace EvolutionalNeuralNetwork
                 Entity father = null;
 
                 var rand = new Random();
-
+                
+                int competition = rand.Next(borderStart, borderEnd);
                 fatherIndex = rand.Next(borderStart, borderEnd);
                 father = entities[fatherIndex];
+
+                if (entities[competition].FitnessValue < father.FitnessValue)
+                {
+                    fatherIndex = competition;
+                    father = entities[fatherIndex];
+                }
 
                 motherIndex = Tournament(father, fatherIndex, rand);
                 mother = entities[motherIndex];
@@ -145,7 +155,7 @@ namespace EvolutionalNeuralNetwork
                 }
 
                 int prey = Prey(child, father, fatherIndex, rand);
-                if (prey != -1)
+                if (prey > -1)
                     entities[prey] = child;
 
                 return entities[borderStart];

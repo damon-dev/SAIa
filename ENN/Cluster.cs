@@ -9,7 +9,7 @@ namespace EvolutionalNeuralNetwork
         public static readonly Guid OutputGuid = new Guid("7bd1acb4-07ba-4838-be56-237d3391b61f");
         public static readonly Guid SeedGuid = new Guid("e3ea29b5-493c-48a6-9c94-c7b418b6d732");
         public static readonly Guid BiasMark = new Guid("d579d9f1-cd6f-4236-9a66-69115ae170d3");
-        public static readonly Guid RecoveryMark = new Guid("39414500-9063-470d-8ce3-744a15bbc0ff");
+        public static readonly Guid RefactoryMark = new Guid("39414500-9063-470d-8ce3-744a15bbc0ff");
 
         public List<Gene> Structure { get; private set; }
         public int SynapseCount { get; private set; }
@@ -94,7 +94,7 @@ namespace EvolutionalNeuralNetwork
                 double strength = elem.Strength;
 
                 if (!neurons.ContainsKey(source))
-                    if (source != BiasMark && source != RecoveryMark)
+                    if (source != BiasMark && source != RefactoryMark)
                         RegisterNeuron(new Neuron(source, this, rand));
 
                 if (!neurons.ContainsKey(dest))
@@ -102,8 +102,8 @@ namespace EvolutionalNeuralNetwork
 
                 if (source == BiasMark)
                     neurons[dest].Bias = strength;
-                else if (source == RecoveryMark)
-                    neurons[dest].Recovery = strength;
+                else if (source == RefactoryMark)
+                    neurons[dest].Refactory = strength;
                 else
                 {
                     neurons[dest].ForceCreateDendrite(neurons[source], strength);
@@ -125,16 +125,16 @@ namespace EvolutionalNeuralNetwork
                         p = new MutationProbabilities
                         {
                             MutationRate = gr,
-                            NeuronCreation = .2,
+                            NeuronCreation = .4,
                             NeuronDeletion = .1,
-                            ConnectionAlteration = .3,
+                            ConnectionAlteration = .5,
                             ConnectionDeletion = .2,
-                            DendriteAlteration = .4,
+                            DendriteAlteration = .6,
                             DendriteDeletion = .3,
                             RandomWalk = .8,
                             WalkErosion = 2,
                             Bias = .2,
-                            Recovery = .1
+                            Refactory = .1
                         };
                         break;
 
@@ -151,7 +151,7 @@ namespace EvolutionalNeuralNetwork
                             RandomWalk = .6,
                             WalkErosion = 3,
                             Bias = .2,
-                            Recovery = .1
+                            Refactory = .1
                         };
                         break;
 
@@ -160,15 +160,15 @@ namespace EvolutionalNeuralNetwork
                         {
                             MutationRate = gr,
                             NeuronCreation = .1,
-                            NeuronDeletion = .2,
+                            NeuronDeletion = .4,
                             ConnectionAlteration = .2,
-                            ConnectionDeletion = .3,
+                            ConnectionDeletion = .5,
                             DendriteAlteration = .3,
-                            DendriteDeletion = .4,
+                            DendriteDeletion = .6,
                             RandomWalk = 1,
                             WalkErosion = 10,
                             Bias = .2,
-                            Recovery = .1
+                            Refactory = .1
                         };
                         break;
                 }
@@ -192,7 +192,7 @@ namespace EvolutionalNeuralNetwork
                 if (neurons[guid].IsImmutable()) continue;
 
                 structure.Add((BiasMark, guid, neurons[guid].Bias));
-                structure.Add((RecoveryMark, guid, neurons[guid].Recovery));
+                structure.Add((RefactoryMark, guid, neurons[guid].Refactory));
             }
 
             foreach (var dest in neurons.Keys)

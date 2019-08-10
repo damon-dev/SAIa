@@ -49,7 +49,11 @@ namespace EvolutionalNeuralNetwork
 
             cultures = new List<Culture>();
             for (int i = 0; i < cultureCount; ++i)
+            {
                 cultures.Add(new Culture(Entities, data, i * cultureSize, (i + 1) * cultureSize, cultureSize / 10 - 1));
+                foreach (var observer in observers)
+                    observer.OnNext(cultures[i].Champion);
+            }
         }
 
         public Task Start()
@@ -61,7 +65,7 @@ namespace EvolutionalNeuralNetwork
 
             overlords = new List<Task<Entity>>();
             foreach(var culture in cultures)
-                overlords.Add(culture.Develop(Mode.Grow));
+                overlords.Add(culture.Develop(Mode.Grow, 1));
 
             return Run();
         }
@@ -77,13 +81,14 @@ namespace EvolutionalNeuralNetwork
                 observers[i].OnCompleted();
         }
 
-        private readonly Dictionary<int, Mode> modes = new Dictionary<int, Mode>
+        private readonly Dictionary<int, (Mode, double)> modes = new Dictionary<int, (Mode, double)>
         {
-            {0, Mode.Shrink },
-            {1, Mode.Balance },
-            {2, Mode.Balance },
-            {3, Mode.Grow }
+            {0, (Mode.Shrink, 0.5) },
+            {1, (Mode.Balance, 0.25) },
+            {2, (Mode.Balance, 0.2) },
+            {3, (Mode.Grow, 0.1) }
         };
+
         private async Task Run()
         {
             while (isRunning)
@@ -94,7 +99,7 @@ namespace EvolutionalNeuralNetwork
                     observer.OnNext(completed.GetAwaiter().GetResult());
 
                 int index = overlords.IndexOf(completed);
-                overlords[index] = cultures[index].Develop(modes[index]);
+                overlords[index] = cultures[index].Develop(modes[index].Item1, modes[index].Item2);
             }
         }
 
@@ -130,7 +135,7 @@ namespace EvolutionalNeuralNetwork
                 Entities.Add(new Entity(initialStructure, data));
 
                 Entities[i].Genes.Add((Cluster.BiasMark, Cluster.SeedGuid, cluster.RandomSynapseStrength()));
-                Entities[i].Genes.Add((Cluster.RecoveryMark, Cluster.SeedGuid, Math.Abs(cluster.RandomSynapseStrength())));
+                Entities[i].Genes.Add((Cluster.RefactoryMark, Cluster.SeedGuid, Math.Abs(cluster.RandomSynapseStrength())));
 
                 var randInput = inputGuids[rand.Next(inputGuids.Count)];
                 var randOutput = outputGuids[rand.Next(outputGuids.Count)];

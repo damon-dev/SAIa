@@ -16,7 +16,7 @@ namespace EvolutionalNeuralNetwork
         public double RandomWalk { get; set; }
         public double WalkErosion { get; set; }
         public double Bias { get; set; }
-        public double Recovery { get; set; }
+        public double Refactory { get; set; }
     }
 
     public class Neuron
@@ -27,7 +27,7 @@ namespace EvolutionalNeuralNetwork
         public Dictionary<Neuron, double> Dendrites { get; set; }
         public List<Neuron> Connections { get; set; }
         public double Bias { get; set; }
-        public double Recovery { get; set; } // relative refactory period recovery rate (greater = faster)
+        public double Refactory { get; set; } // relative refactory period recovery rate (greater = faster)
 
         private double _axon;
         private double Axon
@@ -56,7 +56,7 @@ namespace EvolutionalNeuralNetwork
             get
             {
                 var time = DateTime.UtcNow - LastFired;
-                double denominator = time.TotalMilliseconds * time.TotalMilliseconds * (Recovery + double.Epsilon);
+                double denominator = time.TotalMilliseconds * time.TotalMilliseconds * (Refactory + double.Epsilon);
 
                 return (denominator <= 0) ? double.MaxValue : Signal / denominator;
             }
@@ -71,7 +71,7 @@ namespace EvolutionalNeuralNetwork
             Dendrites = new Dictionary<Neuron, double>();
             Connections = new List<Neuron>();
             Axon = 0;
-            Recovery = 1;
+            Refactory = 1;
 
             parentCluster = _parentCluster;
             rand = _rand;
@@ -253,10 +253,10 @@ namespace EvolutionalNeuralNetwork
             }
 
             percent = rand.NextDouble();
-            if (percent < p.Recovery)
+            if (percent < p.Refactory)
             {
                 // mutated retention
-                Recovery = Math.Abs(parentCluster.RandomSynapseStrength());
+                Refactory = Math.Abs(parentCluster.RandomSynapseStrength());
             }
         }
 
