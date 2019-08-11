@@ -11,8 +11,8 @@ namespace EvolutionalNeuralNetwork
         public double NeuronDeletion { get; set; } 
         public double DendriteAlteration { get; set; } 
         public double DendriteDeletion { get; set; } 
-        public double ConnectionAlteration { get; set; }
-        public double ConnectionDeletion { get; set; }
+        public double AxonAlteration { get; set; }
+        public double AxonDeletion { get; set; }
         public double RandomWalk { get; set; }
         public double WalkErosion { get; set; }
         public double Bias { get; set; }
@@ -22,44 +22,19 @@ namespace EvolutionalNeuralNetwork
     public class Neuron
     {
         public Guid Identifier { get; private set; }
-        public DateTime LastFired { get; private set; }
-        public double Signal { get; private set; }
         public Dictionary<Neuron, double> Dendrites { get; set; }
-        public List<Neuron> Connections { get; set; }
+        public List<Neuron> Axons { get; set; }
         public double Bias { get; set; }
         public double Refactory { get; set; } // relative refactory period recovery rate (greater = faster)
+        public double Depth { get; set; }
+        public double Signal { get; set; }
 
-        private double _axon;
-        private double Axon
+        private double Threshold(double incomingSignalDepth)
         {
-            get
-            {
-                double temp = _axon - Signal;
-                if (temp >= 0)
-                {
-                    _axon = temp;
-                    return Signal;
-                }
+            double cycleLength = incomingSignalDepth - Depth;
+            if (cycleLength <= 0) return double.PositiveInfinity;
 
-                return 0;
-            }
-            set
-            {
-                LastFired = DateTime.UtcNow;
-                Signal = value;
-                _axon = Signal * Connections.Count;
-            }
-        }
-
-        private double Threshold
-        {
-            get
-            {
-                var time = DateTime.UtcNow - LastFired;
-                double denominator = time.TotalMilliseconds * time.TotalMilliseconds * (Refactory + double.Epsilon);
-
-                return (denominator <= 0) ? double.MaxValue : Signal / denominator;
-            }
+            return Signal / cycleLength * (Refactory + double.Epsilon);
         }
 
         private Random rand;
@@ -69,8 +44,9 @@ namespace EvolutionalNeuralNetwork
         {
             Identifier = guid;
             Dendrites = new Dictionary<Neuron, double>();
-            Connections = new List<Neuron>();
-            Axon = 0;
+            Axons = new List<Neuron>();
+            Depth = -1;
+            Signal = 0;
             Refactory = 1;
 
             parentCluster = _parentCluster;
@@ -78,32 +54,39 @@ namespace EvolutionalNeuralNetwork
         }
 
         // returns true if activation was successful
-        public bool Fire(double? forceValue = null)
+        public bool Fire(double incomingSignalDepth, double? forceValue = null)
         {
             if (forceValue != null)
             {
-                Axon = forceValue.Value;
+                Signal = forceValue.Value;
+                Depth = incomingSignalDepth + 1;
 
                 return true;
             }
 
             // send this to gpu
             double signal = Bias;
-            
-            foreach (var den in Dendrites)
-                signal += den.Key.Axon * den.Value;
-            //
 
-            return Activate(signal);
+            foreach (var den in Dendrites)
+            {
+                if (den.Key.Depth == incomingSignalDepth)
+                    signal += den.Key.Signal * den.Value;
+            }
+            if (Dendrites.ContainsKey(this)) // EXPERIMENTAL
+                signal += Signal * Dendrites[this];
+            
+
+            return Activate(signal, incomingSignalDepth);
         }
 
-        public bool Activate(double signal)
+        private bool Activate(double signal, double depth)
         {
-            signal -= Threshold;
+            signal -= Threshold(depth);
 
             if (signal > 0)
             {
-                Axon = signal;
+                Signal = signal;
+                Depth = depth + 1;
                 return true;
             }
 
@@ -114,7 +97,7 @@ namespace EvolutionalNeuralNetwork
         public bool IsImmutable()
         {
             return Dendrites.Keys.Any(k => k.Identifier == Cluster.InputGuid) ||
-                   Connections.Any(s => s.Identifier == Cluster.OutputGuid) ||
+                   Axons.Any(s => s.Identifier == Cluster.OutputGuid) ||
                    Identifier == Cluster.InputGuid ||
                    Identifier == Cluster.OutputGuid;
         }
@@ -150,9 +133,9 @@ namespace EvolutionalNeuralNetwork
             }
 
             percent = rand.NextDouble();
-            if (percent < p.ConnectionDeletion)
+            if (percent < p.AxonDeletion)
             {
-                RandomConnection(this)?.RemoveDendrite(this);
+                RandomAxon(this)?.RemoveDendrite(this);
             }
 
             percent = rand.NextDouble();
@@ -201,7 +184,7 @@ namespace EvolutionalNeuralNetwork
             }
 
             percent = rand.NextDouble();
-            if (percent < p.ConnectionAlteration)
+            if (percent < p.AxonAlteration)
             {
                 double walkP = p.RandomWalk;
                 Neuron neuron;
@@ -209,7 +192,7 @@ namespace EvolutionalNeuralNetwork
                 percent = rand.NextDouble();
                 if (percent < walkP) // alters an existing connection
                 {
-                    neuron = RandomConnection(this);
+                    neuron = RandomAxon(this);
                     if (neuron != null) neuron.Dendrites[this] = parentCluster.RandomSynapseStrength();
                     walkP /= p.WalkErosion;
                 }
@@ -267,7 +250,7 @@ namespace EvolutionalNeuralNetwork
             else
             {
                 Dendrites.Add(origin, strength);
-                origin.Connections.Add(this);
+                origin.Axons.Add(this);
             }
         }
 
@@ -287,7 +270,7 @@ namespace EvolutionalNeuralNetwork
             if (origin != null && Dendrites.ContainsKey(origin))
             {
                 Dendrites.Remove(origin);
-                origin.Connections.Remove(this);
+                origin.Axons.Remove(this);
             }
         }
 
@@ -299,10 +282,10 @@ namespace EvolutionalNeuralNetwork
             {
                 var sourceDendrite = RandomDendrite(this);
                 var topDendrite = RandomDendrite(sourceDendrite);
-                var destDendrite = RandomConnection(topDendrite);
+                var destDendrite = RandomAxon(topDendrite);
 
-                var sourceConnection = RandomConnection(this);
-                var bottomConnection = RandomConnection(sourceConnection);
+                var sourceConnection = RandomAxon(this);
+                var bottomConnection = RandomAxon(sourceConnection);
                 var destConnection = RandomDendrite(bottomConnection);
 
                 if (destConnection == null || destDendrite == null) return;
@@ -319,7 +302,7 @@ namespace EvolutionalNeuralNetwork
                 foreach (var den in Dendrites)
                 {
 
-                    foreach (var con in Connections)
+                    foreach (var con in Axons)
                     {
                         if (!((den.Key.IsImmutable() && con.IsImmutable()) ||
                                den.Key.Equals(this) ||
@@ -328,10 +311,10 @@ namespace EvolutionalNeuralNetwork
                             con.CreateDendrite(den.Key, (den.Value + con.Dendrites[this]) / 2);
                     }
                     
-                    den.Key.Connections.Remove(this);
+                    den.Key.Axons.Remove(this);
                 }
 
-                foreach (var con in Connections)
+                foreach (var con in Axons)
                 {
                     con.Dendrites.Remove(this);
                 }
@@ -346,18 +329,18 @@ namespace EvolutionalNeuralNetwork
             return list[rand.Next(list.Count)];
         }
 
-        private Neuron RandomConnection(Neuron neuron)
+        private Neuron RandomAxon(Neuron neuron)
         {
-            if (neuron == null || neuron.Connections.Count == 0) return null;
+            if (neuron == null || neuron.Axons.Count == 0) return null;
 
-            var list = neuron.Connections;
+            var list = neuron.Axons;
             return list[rand.Next(list.Count)];
         }
 
         private Neuron RandomStepUp(Neuron neuron, int step)
         {
             if (step < 0)
-                return RandomConnection(neuron);
+                return RandomAxon(neuron);
 
             return RandomStepUp(RandomDendrite(neuron), step - 1);
         }
@@ -367,7 +350,7 @@ namespace EvolutionalNeuralNetwork
             if (step < 0)
                 return RandomDendrite(neuron);
 
-            return RandomStepDown(RandomConnection(neuron), step - 1);
+            return RandomStepDown(RandomAxon(neuron), step - 1);
         }
     }
 }

@@ -27,9 +27,9 @@ namespace EvolutionalNeuralNetwork
         private int Tournament(Entity mate, int mateIndex, Random rand)
         {
             int position = -1;
-            double bestFitnes = double.MaxValue;
+            double bestFitnes = double.PositiveInfinity;
             int alrightPosition = -1;
-            double alrightFitness = double.MaxValue;
+            double alrightFitness = double.PositiveInfinity;
 
             for (int i = 0; i < tournamentSize; ++i)
             {
@@ -144,7 +144,7 @@ namespace EvolutionalNeuralNetwork
                 });
 
                 Entity child = null;
-                double bestFitness = double.MaxValue;
+                double bestFitness = double.PositiveInfinity;
                 foreach(var c in kids)
                 {
                     if (c.FitnessValue < bestFitness)

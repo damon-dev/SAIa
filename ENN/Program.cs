@@ -10,13 +10,13 @@ namespace EvolutionalNeuralNetwork
         private const int size = 50;
         private IDisposable stopper;
         private Entity currentChampion;
-        private XORDisplayProtocol displayProtocol;
+        private MNISTDisplayProtocol displayProtocol;
 
         static void Main(string[] args)
         {
             var program = new Program();
-            var data = new XORDataCollection();
-            program.displayProtocol = new XORDisplayProtocol(data);
+            var data = new MNISTDataCollection();
+            program.displayProtocol = new MNISTDisplayProtocol(data);
             var environment = new Environment(data);
 
             program.stopper = environment.Subscribe(program);

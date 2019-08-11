@@ -17,7 +17,7 @@ namespace EvolutionalNeuralNetwork
 
         public virtual void Display(Entity champion)
         {
-            if (champion == null)
+            if (champion == null || champion.FitnessValue == double.PositiveInfinity)
             {
                 Console.WriteLine("T: Train L: Load S: Stop Q: Quit");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);

@@ -15,7 +15,7 @@ namespace EvolutionalNeuralNetwork.XOR
         {
             base.Display(champion);
 
-            if (champion == null) return;
+            if (champion == null || champion.FitnessValue == double.PositiveInfinity) return;
 
             var cluster = new Cluster(new Random());
             cluster.GenerateFromStructure(champion.Genes);
@@ -27,7 +27,7 @@ namespace EvolutionalNeuralNetwork.XOR
                 var preditcedOutput = cluster.Querry(input[i], out int steps);
                 cluster.Nap();
 
-                Console.WriteLine($"{input[i][0]} ^ {input[i][1]} = {preditcedOutput[0]:0.00000}");
+                Console.WriteLine($"{input[i][0]} ^ {input[i][1]} = {((preditcedOutput != null) ? preditcedOutput[0] : -1):0.00000}");
                 totalSteps += steps;
             }
 

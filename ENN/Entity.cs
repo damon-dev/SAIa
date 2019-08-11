@@ -17,7 +17,7 @@ namespace EvolutionalNeuralNetwork
 
         public Entity() { }
 
-        public Entity(List<Gene> initialStructure, DataCollection _dataSource, double fitness = double.MaxValue)
+        public Entity(List<Gene> initialStructure, DataCollection _dataSource, double fitness = double.PositiveInfinity)
         {
             dataSource = _dataSource;
             Genes = new List<Gene>(initialStructure);
@@ -31,10 +31,15 @@ namespace EvolutionalNeuralNetwork
             var predictedOutput = cluster.Querry(input, out int steps);
             cluster.Nap();
 
-            for (int i = 0; i < expectedOutput.Count; ++i)
-                squareSum += (predictedOutput[i] - expectedOutput[i]) * (predictedOutput[i] - expectedOutput[i]);
+            if (steps == -1)
+                squareSum = double.PositiveInfinity;
+            else
+            {
+                for (int i = 0; i < expectedOutput.Count; ++i)
+                    squareSum += (predictedOutput[i] - expectedOutput[i]) * (predictedOutput[i] - expectedOutput[i]);
 
-            squareSum /= expectedOutput.Count;
+                squareSum /= expectedOutput.Count;
+            }
 
             return squareSum;
         }
@@ -51,19 +56,21 @@ namespace EvolutionalNeuralNetwork
 
             Genes = cluster.GenerateFromStructure(Genes, mode, mutationRate);
 
-            double meanSquareSum = 0;
-            for (int i = 0; i < input.Count; ++i)
-                meanSquareSum += SquareSum(cluster, input[i], expectedOutput[i]);
-
-            meanSquareSum /= input.Count;
-
             if (cluster.NeuronCount == 0)
-                FitnessValue = double.MaxValue;
+                FitnessValue = double.PositiveInfinity;
             else
-                FitnessValue = input.Count * Math.Log(meanSquareSum) +// Math.Pow(Math.Log(meanSquareSum), 1) +
+            {
+                double meanSquareSum = 0;
+                for (int i = 0; i < input.Count; ++i)
+                    meanSquareSum += SquareSum(cluster, input[i], expectedOutput[i]);
+
+                meanSquareSum /= input.Count;
+
+                FitnessValue = input.Count * Math.Pow(Math.Log(meanSquareSum), 3) +
                                                                       //(cluster.NeuronCount) /
                                                                       //(double)(cluster.InputSize + cluster.OutputSize);
                                cluster.NeuronCount + cluster.SynapseCount;
+            }
         }
 
         public bool Compatible(Entity mate)

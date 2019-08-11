@@ -13,7 +13,7 @@ namespace EvolutionalNeuralNetwork
 
         public List<Gene> Structure { get; private set; }
         public int SynapseCount { get; private set; }
-        public int InputSize => neurons[InputGuid].Connections.Count;
+        public int InputSize => neurons[InputGuid].Axons.Count;
         public int OutputSize => neurons[OutputGuid].Dendrites.Count;
         public int NeuronCount => neuronGuids.Count - InputSize - OutputSize;
 
@@ -33,35 +33,6 @@ namespace EvolutionalNeuralNetwork
         {
             // random value between -1 and 1
             return rand.NextDouble() * 2 - 1;
-        }
-
-        public List<double> Querry(List<double> inputs, out int steps)
-        {
-            Propagate(inputs, out steps);
-
-            var outputNeurons = new List<Gene>();
-            var outputs = new List<double>();
-
-            foreach (var key in neurons[OutputGuid].Dendrites.Keys)
-            {
-                double response = key.Signal;
-
-                outputNeurons.Add((key.Identifier, OutputGuid, response)); // adding signal instead of strength as its what represents the output
-            }
-
-            outputNeurons.Sort(); // makes sure the order is correct related to the input
-
-            foreach (var neuron in outputNeurons)
-                outputs.Add(neuron.Strength);
-
-            return outputs;
-        }
-
-        public void Nap()
-        {
-            // BIG TODO: implement synaptic plasticity here
-            foreach (var neuron in neurons.Values)
-                neuron.Fire(0);
         }
 
         // No mutation
@@ -127,8 +98,8 @@ namespace EvolutionalNeuralNetwork
                             MutationRate = gr,
                             NeuronCreation = .4,
                             NeuronDeletion = .1,
-                            ConnectionAlteration = .5,
-                            ConnectionDeletion = .2,
+                            AxonAlteration = .5,
+                            AxonDeletion = .2,
                             DendriteAlteration = .6,
                             DendriteDeletion = .3,
                             RandomWalk = .8,
@@ -144,8 +115,8 @@ namespace EvolutionalNeuralNetwork
                             MutationRate = gr,
                             NeuronCreation = .1,
                             NeuronDeletion = .1,
-                            ConnectionAlteration = .2,
-                            ConnectionDeletion = .2,
+                            AxonAlteration = .2,
+                            AxonDeletion = .2,
                             DendriteAlteration = .3,
                             DendriteDeletion = .3,
                             RandomWalk = .6,
@@ -161,8 +132,8 @@ namespace EvolutionalNeuralNetwork
                             MutationRate = gr,
                             NeuronCreation = .1,
                             NeuronDeletion = .4,
-                            ConnectionAlteration = .2,
-                            ConnectionDeletion = .5,
+                            AxonAlteration = .2,
+                            AxonDeletion = .5,
                             DendriteAlteration = .3,
                             DendriteDeletion = .6,
                             RandomWalk = 1,
@@ -240,46 +211,78 @@ namespace EvolutionalNeuralNetwork
             return neurons[neuronGuids[index]];
         }
 
+        public List<double> Querry(List<double> inputs, out int steps)
+        {
+            Propagate(inputs, out steps);
+
+            if (steps >= 0)
+            {
+                var outputNeurons = new List<Gene>();
+                var outputs = new List<double>();
+
+                foreach (var key in neurons[OutputGuid].Dendrites.Keys)
+                {
+                    double response = key.Signal;
+
+                    outputNeurons.Add((key.Identifier, OutputGuid, response)); // adding signal instead of strength as its what represents the output
+                }
+
+                outputNeurons.Sort(); // makes sure the order is correct related to the input
+
+                foreach (var neuron in outputNeurons)
+                    outputs.Add(neuron.Strength);
+
+                return outputs;
+            }
+            else
+                return null;
+        }
+
+        public void Nap()
+        {
+            // BIG TODO: implement synaptic plasticity here
+            foreach (var neuron in neurons.Values)
+                neuron.Fire(-2, 0);
+        }
+
         /// <summary>
         /// Fires all neurons in the cluster BFS style.
         /// </summary>
         /// <returns>True if the graph has a cycle, false if the graph is a tree.</returns>
         private void Propagate(List<double> inputs, out int steps)
         {
-            var queue = new Queue<Neuron>();
+            var queue = new Queue<(Neuron, double)>();
             steps = 0;
 
             // baking the inputs into the input neuron axons
-            for (int i = 0; i < neurons[InputGuid].Connections.Count; ++i)
+            for (int i = 0; i < neurons[InputGuid].Axons.Count; ++i)
             {
-                var inputNeuron = neurons[InputGuid].Connections[i];
+                var inputNeuron = neurons[InputGuid].Axons[i];
 
-                inputNeuron.Fire(inputs[i]);
+                inputNeuron.Fire(-1, inputs[i]);
 
-                foreach (var successor in inputNeuron.Connections)
+                foreach (var successor in inputNeuron.Axons)
                 {
-                    queue.Enqueue(successor);
+                    queue.Enqueue((successor, inputNeuron.Depth));
                 }
             }
 
-            while (queue.Count > 0)
+            while (queue.Count > 0 && queue.Peek().Item2 < NeuronCount * 10)
             {
-                var current = queue.Dequeue();
-                if (current.Fire())
+                var nextNeuron = queue.Peek().Item1;
+                var fromDepth = queue.Dequeue().Item2;
+
+                if (nextNeuron.Fire(fromDepth))
                 {
                     steps++;
-                    Neuron mem = null;
-                    foreach (var successor in current.Connections)
+                    foreach (var successor in nextNeuron.Axons)
                     {
-                        if (successor.Equals(current))
-                            mem = successor;
-                        else
-                            queue.Enqueue(successor);
+                        queue.Enqueue((successor, nextNeuron.Depth));
                     }
-                    if (mem != null)
-                        queue.Enqueue(mem);
                 }
             }
+
+            if (queue.Count > 0) steps = -1;
         }
     }
 }

@@ -83,9 +83,9 @@ namespace EvolutionalNeuralNetwork
 
         private readonly Dictionary<int, (Mode, double)> modes = new Dictionary<int, (Mode, double)>
         {
-            {0, (Mode.Shrink, 0.5) },
+            {0, (Mode.Balance, 0.2) },
             {1, (Mode.Balance, 0.25) },
-            {2, (Mode.Balance, 0.2) },
+            {2, (Mode.Shrink, 0.5) },
             {3, (Mode.Grow, 0.1) }
         };
 
