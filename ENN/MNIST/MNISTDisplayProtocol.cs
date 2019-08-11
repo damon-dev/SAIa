@@ -8,7 +8,7 @@ namespace EvolutionalNeuralNetwork.MNIST
         public MNISTDisplayProtocol(MNISTDataCollection data)
         {
             //data.FetchTestData(out input, out expectedOutput, 0);
-            data.FetchTrainingData(out input, out expectedOutput, 100, false);
+            data.FetchTrainingData(out input, out expectedOutput, 10, false);
         }
 
         public override void Display(Entity champion)

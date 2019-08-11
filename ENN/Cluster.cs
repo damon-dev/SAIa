@@ -282,7 +282,8 @@ namespace EvolutionalNeuralNetwork
                 }
             }
 
-            if (queue.Count > 0) steps = -1;
+            if (queue.Count > 0)
+                steps = -1;
         }
     }
 }

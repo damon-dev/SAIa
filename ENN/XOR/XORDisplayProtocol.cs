@@ -22,7 +22,7 @@ namespace EvolutionalNeuralNetwork.XOR
 
             double totalSteps = 0;
 
-            for (int i = 0; i < input.Count; i++)
+            for (int i = input.Count - 1; i >= 0; i--)
             {
                 var preditcedOutput = cluster.Querry(input[i], out int steps);
                 cluster.Nap();

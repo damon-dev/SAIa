@@ -52,7 +52,7 @@ namespace EvolutionalNeuralNetwork
         public void EvaluateFitness(Mode mode, double mutationRate, Random rand)
         {
             var cluster = new Cluster(rand);
-            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 100, false);
+            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 10, false);
 
             Genes = cluster.GenerateFromStructure(Genes, mode, mutationRate);
 
@@ -67,8 +67,8 @@ namespace EvolutionalNeuralNetwork
                 meanSquareSum /= input.Count;
 
                 FitnessValue = input.Count * Math.Pow(Math.Log(meanSquareSum), 3) +
-                                                                      //(cluster.NeuronCount) /
-                                                                      //(double)(cluster.InputSize + cluster.OutputSize);
+                               //(cluster.NeuronCount + cluster.SynapseCount) /
+                               //(double)(cluster.InputSize + cluster.OutputSize);
                                cluster.NeuronCount + cluster.SynapseCount;
             }
         }

@@ -29,12 +29,13 @@ namespace EvolutionalNeuralNetwork
         public double Depth { get; set; }
         public double Signal { get; set; }
 
+        private double _threshold;
         private double Threshold(double incomingSignalDepth)
         {
             double cycleLength = incomingSignalDepth - Depth;
             if (cycleLength <= 0) return double.PositiveInfinity;
 
-            return Signal / cycleLength * (Refactory + double.Epsilon);
+            return _threshold / (Math.Pow(cycleLength, 2));// * (Refactory + double.Epsilon));
         }
 
         private Random rand;
@@ -47,6 +48,7 @@ namespace EvolutionalNeuralNetwork
             Axons = new List<Neuron>();
             Depth = -1;
             Signal = 0;
+            _threshold = 0;
             Refactory = 1;
 
             parentCluster = _parentCluster;
@@ -59,6 +61,7 @@ namespace EvolutionalNeuralNetwork
             if (forceValue != null)
             {
                 Signal = forceValue.Value;
+                _threshold = Signal;
                 Depth = incomingSignalDepth + 1;
 
                 return true;
@@ -81,11 +84,12 @@ namespace EvolutionalNeuralNetwork
 
         private bool Activate(double signal, double depth)
         {
-            signal -= Threshold(depth);
+            double potential = signal - Threshold(depth);
 
-            if (signal > 0)
+            if (potential > 0)
             {
-                Signal = signal;
+                Signal = potential;
+                _threshold = signal;
                 Depth = depth + 1;
                 return true;
             }
