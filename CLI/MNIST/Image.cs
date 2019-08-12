@@ -1,4 +1,4 @@
-﻿namespace EvolutionalNeuralNetwork.MNIST
+﻿namespace CLI.MNIST
 {
     public class ByteImage
     {

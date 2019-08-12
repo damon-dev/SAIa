@@ -1,14 +1,15 @@
-﻿using System;
+﻿using Core;
+using System;
 using System.Linq;
 
-namespace EvolutionalNeuralNetwork.MNIST
+namespace CLI.MNIST
 {
     public class MNISTDisplayProtocol : DisplayProtocol
     {
         public MNISTDisplayProtocol(MNISTDataCollection data)
         {
-            //data.FetchTestData(out input, out expectedOutput, 0);
-            data.FetchTrainingData(out input, out expectedOutput, 10, false);
+            //data.FetchTestData(out input, out expectedOutput, 100);
+            data.FetchTrainingData(out input, out expectedOutput, 100, false);
         }
 
         public override void Display(Entity champion)
@@ -22,15 +23,17 @@ namespace EvolutionalNeuralNetwork.MNIST
 
             double totalSteps = 0;
             double[] errorRate = new double[10];
+            double[] totalElements = new double[10];
 
             for (int i = 0; i < input.Count; i++)
             {
-                var preditcedOutput = cluster.Querry(input[i], out int steps);
+                var preditcedOutput = cluster.Querry(input[i], out long steps);
                 cluster.Nap();
                 if (preditcedOutput != null)
                     errorRate[(int)(expectedOutput[i][0] * 10)] += (preditcedOutput[0] - expectedOutput[i][0]) * (preditcedOutput[0] - expectedOutput[i][0]);
                 else
                     errorRate[(int)(expectedOutput[i][0] * 10)] += 1;
+                totalElements[(int)(expectedOutput[i][0] * 10)]++;
                 totalSteps += steps;
             }
 
@@ -38,7 +41,7 @@ namespace EvolutionalNeuralNetwork.MNIST
 
             for (int i = 0; i < 10; ++i)
             {
-                errorRate[i] /= 10;
+                errorRate[i] /= totalElements[i];
                 Console.WriteLine($"{i} : {errorRate[i]:0.00000}");
             }
 

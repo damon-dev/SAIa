@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 
-namespace EvolutionalNeuralNetwork.MNIST
+namespace CLI.MNIST
 {
     public static class MnistReader
     {

@@ -1,7 +1,8 @@
-﻿using System;
+﻿using Core;
+using System;
 using System.Collections.Generic;
 
-namespace EvolutionalNeuralNetwork
+namespace CLI
 {
     public enum Response { Quit, Load, Train, Stop, Ignore }
 

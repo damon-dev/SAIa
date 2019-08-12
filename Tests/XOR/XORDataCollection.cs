@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using Core;
+using System.Collections.Generic;
 
-namespace EvolutionalNeuralNetwork.XOR
+namespace Tests.XOR
 {
-    public class XORDataCollection : DataCollection
+    public class XORDataCollection : Data
     {
         public XORDataCollection()
         {
@@ -22,8 +23,8 @@ namespace EvolutionalNeuralNetwork.XOR
                 new List<double> {0}
             };
 
-            InputWidth = TrainingInput[0].Count;
-            OutputWidth = TrainingOutput[0].Count;
+            InputFeatureCount = TrainingInput[0].Count;
+            OutputFeatureCount = TrainingOutput[0].Count;
         }
     }
 }

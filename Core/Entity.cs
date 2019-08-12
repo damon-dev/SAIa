@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace EvolutionalNeuralNetwork
+namespace Core
 {
     [JsonObject]
     public class Entity
@@ -11,13 +11,13 @@ namespace EvolutionalNeuralNetwork
         [JsonProperty]
         public List<Gene> Genes { get; private set; }
         [JsonProperty]
-        public double FitnessValue { get; private set; } // the closer to 0 the better
+        public double FitnessValue { get; private set; } // the smaller the better
 
-        private DataCollection dataSource;
+        private Data dataSource;
 
         public Entity() { }
 
-        public Entity(List<Gene> initialStructure, DataCollection _dataSource, double fitness = double.PositiveInfinity)
+        public Entity(List<Gene> initialStructure, Data _dataSource, double fitness = double.PositiveInfinity)
         {
             dataSource = _dataSource;
             Genes = new List<Gene>(initialStructure);
@@ -28,7 +28,7 @@ namespace EvolutionalNeuralNetwork
         {
             double squareSum = 0;
 
-            var predictedOutput = cluster.Querry(input, out int steps);
+            var predictedOutput = cluster.Querry(input, out long steps);
             cluster.Nap();
 
             if (steps == -1)
@@ -52,7 +52,7 @@ namespace EvolutionalNeuralNetwork
         public void EvaluateFitness(Mode mode, double mutationRate, Random rand)
         {
             var cluster = new Cluster(rand);
-            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 10, false);
+            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 100, false);
 
             Genes = cluster.GenerateFromStructure(Genes, mode, mutationRate);
 
@@ -60,15 +60,23 @@ namespace EvolutionalNeuralNetwork
                 FitnessValue = double.PositiveInfinity;
             else
             {
-                double meanSquareSum = 0;
+                double[] meanSquareSums = new double[input.Count];
+                double mean = 0;
+
+                //Parallel.For(0, input.Count, (i) =>
                 for (int i = 0; i < input.Count; ++i)
-                    meanSquareSum += SquareSum(cluster, input[i], expectedOutput[i]);
+                {
+                    //var cl = new Cluster(new Random());
+                    //cl.GenerateFromStructure(Genes);
+                    meanSquareSums[i] = SquareSum(cluster, input[i], expectedOutput[i]);
+                }//);
 
-                meanSquareSum /= input.Count;
+                for (int i = 0; i < input.Count; ++i)
+                    mean += meanSquareSums[i];
 
-                FitnessValue = input.Count * Math.Pow(Math.Log(meanSquareSum), 3) +
-                               //(cluster.NeuronCount + cluster.SynapseCount) /
-                               //(double)(cluster.InputSize + cluster.OutputSize);
+                mean /= input.Count;
+
+                FitnessValue = input.Count * Math.Pow(Math.Log(mean), 3) +
                                cluster.NeuronCount + cluster.SynapseCount;
             }
         }
@@ -98,7 +106,7 @@ namespace EvolutionalNeuralNetwork
             return true;
         }
 
-        public List<Entity> Copulate(Entity father, Mode mode, Random rand)
+        public Entity Copulate(Entity father, Mode mode, Random rand)
         {
             Entity mother = this;
 
@@ -163,83 +171,48 @@ namespace EvolutionalNeuralNetwork
                 fatherUniqueStructure.Add(gene);
             }
 
-            var kids = new List<Entity>();
-
-            switch(mode)
+            // father is the weaker one
+            switch (mode)
             {
                 case Mode.Grow:
-                    // similar to both X
-                    kids.Add(MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure, dataSource, rand));
-                    // similar to both Y
-                    kids.Add(MoreLike(fatherGenes, fatherUniqueStructure, motherUniqueStructure, commonStructure, dataSource, rand));
-                    break;
+                    // more like mother
+                    return MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure, dataSource, rand);
 
                 case Mode.Balance:
-                    // similar to both X
-                    kids.Add(MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure, dataSource, rand));
-                    // similar to both Y
-                    kids.Add(MoreLike(fatherGenes, fatherUniqueStructure, motherUniqueStructure, commonStructure, dataSource, rand));
-                    // more like mother
-                    kids.Add(ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure, dataSource, rand));
-                    // more like father
-                    kids.Add(ExclusiveMoreLike(fatherGenes, fatherUniqueStructure, commonStructure, dataSource, rand));
-                    break;
+                    // exclusive more like mother
+                    return ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure, dataSource, rand);
 
                 case Mode.Shrink:
-                    // more like mother
-                    kids.Add(ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure, dataSource, rand));
-                    // more like father
-                    kids.Add(ExclusiveMoreLike(fatherGenes, fatherUniqueStructure, commonStructure, dataSource, rand));
-                    // only similar to both
-                    kids.Add(new Entity(commonStructure, dataSource));
-                    break;
-            }
+                    // absolute more like mother
+                    return AbsoluteMoreLike(motherGenes, motherUniqueStructure, commonStructure, dataSource, rand);
 
-            return kids;
+                default: return null;
+            }
         }
 
-        private Entity ExclusiveMoreLike(List<Gene> genome, List<Gene> uniqueGenome, List<Gene> common, DataCollection data, Random rand)
+        private Entity AbsoluteMoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> common, Data data, Random rand)
         {
             var baby = new Entity(common, data);
 
             int i = 0;
             int b = 0;
-            for (i = 0; i < genome.Count && b < baby.Genes.Count; ++i)
+            for (i = 0; i < dominant.Count && b < baby.Genes.Count; ++i)
             {
-                var X = genome[i];
+                var X = dominant[i];
                 var B = baby.Genes[b];
                 if (X.Source == B.Source && X.Destination == B.Destination)
                 {
                     B.Strength -= CalculateOffset(B.Strength, X.Strength, rand);
                     b++;
                 }
-            }
-
-            for (i = 0; i < uniqueGenome.Count; ++i)
-            {
-                var gene = uniqueGenome[i];
-                gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
-                baby.Genes.Add(gene);
             }
 
             return baby;
         }
 
-        private Entity MoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> uniqueRecesive, List<Gene> common, DataCollection data, Random rand)
+        private Entity ExclusiveMoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> common, Data data, Random rand)
         {
-            var baby = new Entity(common, data);
-
-            int b = 0;
-            for (int k = 0; k < dominant.Count && b < baby.Genes.Count; ++k)
-            {
-                var X = dominant[k];
-                var B = baby.Genes[b];
-                if (X.Source == B.Source && X.Destination == B.Destination)
-                {
-                    B.Strength -= CalculateOffset(B.Strength, X.Strength, rand);
-                    b++;
-                }
-            }
+            var baby = AbsoluteMoreLike(dominant, uniqueDominant, common, data, rand);
 
             for (int i = 0; i < uniqueDominant.Count; ++i)
             {
@@ -247,6 +220,13 @@ namespace EvolutionalNeuralNetwork
                 gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
                 baby.Genes.Add(gene);
             }
+
+            return baby;
+        }
+
+        private Entity MoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> uniqueRecesive, List<Gene> common, Data data, Random rand)
+        {
+            var baby = ExclusiveMoreLike(dominant, uniqueDominant, common, data, rand);
 
             for (int i = 0; i < uniqueRecesive.Count; ++i)
             {

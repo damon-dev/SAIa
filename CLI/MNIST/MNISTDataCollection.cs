@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Core;
+using System;
 using System.Collections.Generic;
-using System.IO;
 
-namespace EvolutionalNeuralNetwork.MNIST
+namespace CLI.MNIST
 {
-    public class MNISTDataCollection : DataCollection
+    public class MNISTDataCollection : Data
     {
         private readonly List<int>[] trainingKeep;
 
@@ -27,8 +27,8 @@ namespace EvolutionalNeuralNetwork.MNIST
                 TestOutput.Add(ProcessLabel(image.Label));
             }
 
-            InputWidth = TrainingInput[0].Count;
-            OutputWidth = TrainingOutput[0].Count;
+            InputFeatureCount = TrainingInput[0].Count;
+            OutputFeatureCount = TrainingOutput[0].Count;
         }
 
         public override void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count, bool random)
@@ -72,7 +72,7 @@ namespace EvolutionalNeuralNetwork.MNIST
             input = new List<List<double>>();
             output = new List<List<double>>();
 
-            if (count <= 0) count = TestInput.Count;
+            if (count <= 0 || count > TestInput.Count) count = TestInput.Count;
 
             for (int i = 0; i < count; ++i)
             {

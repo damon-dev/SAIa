@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{79DA440D-BE51-4BFE-8017-342F4257B5EC}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>ENNWindows</RootNamespace>
-    <AssemblyName>ENNWindows</AssemblyName>
+    <RootNamespace>WinGUI</RootNamespace>
+    <AssemblyName>WinGUI</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -95,9 +95,9 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ENN\ENN.csproj">
-      <Project>{7b34535c-1cae-4b77-b301-d7bc6998e689}</Project>
-      <Name>ENN</Name>
+    <ProjectReference Include="..\Core\Core.csproj">
+      <Project>{1b1c41a6-d6c7-4448-a493-68d78d7d82a3}</Project>
+      <Name>Core</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

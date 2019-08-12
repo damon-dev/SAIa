@@ -4,21 +4,22 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace EvolutionalNeuralNetwork
+namespace Core
 {
-    public class DataCollection
+    public class Data
     {
+        // TODO: able to change from the program
         private const string genealogyPath = "Geneaology/culture.json";
 
-        public int InputWidth { get; protected set; }
-        public int OutputWidth { get; protected set; }
+        public int InputFeatureCount { get; protected set; }
+        public int OutputFeatureCount { get; protected set; }
 
         protected List<List<double>> TrainingInput;
         protected List<List<double>> TrainingOutput;
         protected List<List<double>> TestInput;
         protected List<List<double>> TestOutput;
 
-        public DataCollection()
+        public Data()
         {
             TrainingInput = new List<List<double>>();
             TrainingOutput = new List<List<double>>();
@@ -26,14 +27,43 @@ namespace EvolutionalNeuralNetwork
             TestOutput = new List<List<double>>();
         }
 
-        public virtual void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count, bool random)
+        public virtual void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count = 0, bool random = false)
         {
-            input = TrainingInput.Take(count).ToList();
-            output = TrainingOutput.Take(count).ToList();
+            if (count <= 0 || count > TrainingInput.Count)
+                count = TrainingInput.Count;
+
+            if (count > TrainingInput.Count / 2 && random)
+                throw new ArgumentException(nameof(count), "If random is true, no more than half of the training samples are allowed to be requested.");
+
+            input = new List<List<double>>();
+            output = new List<List<double>>();
+
+            var rand = new Random();
+            var used = new HashSet<int>();
+
+            for (int i = 0; i < count; ++i)
+            {
+                int index;
+                if (random)
+                {
+                    index = rand.Next(TrainingInput.Count);
+                    while (used.Contains(index))
+                        index = rand.Next(TrainingInput.Count);
+                }
+                else
+                    index = i;
+
+                used.Add(index);
+                input.Add(TrainingInput[index]);
+                output.Add(TrainingOutput[index]);
+            }
         }
 
         public virtual void FetchTestData(out List<List<double>> input, out List<List<double>> output, int count)
         {
+            if (count <= 0 || count > TestInput.Count)
+                count = TestInput.Count;
+
             input = TestInput.Take(count).ToList();
             output = TestOutput.Take(count).ToList();
         }
@@ -66,13 +96,16 @@ namespace EvolutionalNeuralNetwork
             }
         }
 
-        public bool SaveEntities(List<Entity> entities)
+        public bool SaveEntities(List<Entity> entities, int count = 0)
         {
             try
             {
                 if (entities == null) return false;
 
-                var container = new EntityContainer(entities);
+                if (count <= 0 || count > entities.Count)
+                    count = entities.Count;
+
+                var container = new EntityContainer(entities.Take(count).ToList());
 
                 Directory.CreateDirectory("Geneaology");
                 // serialize JSON directly to a file

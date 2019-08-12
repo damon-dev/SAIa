@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace EvolutionalNeuralNetwork
+namespace Core
 {
     /// <summary>
     /// Describes a edge with its weight in the graph.

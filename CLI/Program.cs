@@ -1,8 +1,8 @@
-﻿using EvolutionalNeuralNetwork.XOR;
-using EvolutionalNeuralNetwork.MNIST;
+﻿using CLI.MNIST;
+using Core;
 using System;
 
-namespace EvolutionalNeuralNetwork
+namespace CLI
 {
     class Program : IObserver<Entity>
     {
@@ -17,22 +17,22 @@ namespace EvolutionalNeuralNetwork
             var program = new Program();
             var data = new MNISTDataCollection();
             program.displayProtocol = new MNISTDisplayProtocol(data);
-            var environment = new Environment(data);
+            var incubator = new Incubator(data);
 
-            program.stopper = environment.Subscribe(program);
+            program.stopper = incubator.Subscribe(program);
 
             program.displayProtocol.Display(null);
 
             switch(program.displayProtocol.ReadResponse())
             {
                 case Response.Load:
-                    environment.Populate(true, threadCount, size);
-                    environment.Start();
+                    incubator.Populate(true, threadCount, size);
+                    incubator.Start();
                     break;
 
                 case Response.Train:
-                    environment.Populate(false, threadCount, size);
-                    environment.Start();
+                    incubator.Populate(false, threadCount, size);
+                    incubator.Start();
                     break;
 
                 default:
@@ -45,12 +45,12 @@ namespace EvolutionalNeuralNetwork
                 switch (response)
                 {
                     case Response.Train:
-                        program.stopper = environment.Subscribe(program);
-                        environment.Start();
+                        program.stopper = incubator.Subscribe(program);
+                        incubator.Start();
                         break;
 
                     case Response.Stop:
-                        environment.Stop(true);
+                        incubator.Stop(true);
                         break;
 
                     default:
@@ -58,7 +58,7 @@ namespace EvolutionalNeuralNetwork
                 }
             }
 
-            environment.Stop(false);
+            incubator.Stop(false);
         }
 
         public void OnCompleted()

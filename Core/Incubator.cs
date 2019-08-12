@@ -2,20 +2,19 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace EvolutionalNeuralNetwork
+namespace Core
 {
-
-    public class Environment : IObservable<Entity>
+    public class Incubator : IObservable<Entity>
     {
         public List<Entity> Entities { get; set; }
         
         private bool isRunning;
-        private DataCollection data;
+        private Data data;
         private List<IObserver<Entity>> observers;
         private List<Culture> cultures;
         private List<Task<Entity>> overlords;
 
-        public Environment(DataCollection _data)
+        public Incubator(Data _data)
         {
             observers = new List<IObserver<Entity>>();
 
@@ -83,10 +82,10 @@ namespace EvolutionalNeuralNetwork
 
         private readonly Dictionary<int, (Mode, double)> modes = new Dictionary<int, (Mode, double)>
         {
-            {0, (Mode.Balance, 0.2) },
-            {1, (Mode.Balance, 0.25) },
-            {2, (Mode.Shrink, 0.5) },
-            {3, (Mode.Grow, 0.1) }
+            {0, (Mode.Balance, 0.3) },
+            {1, (Mode.Shrink, 0.3) },
+            {2, (Mode.Grow, 0.3) },
+            {3, (Mode.Balance, 0.6) }
         };
 
         private async Task Run()
@@ -111,8 +110,8 @@ namespace EvolutionalNeuralNetwork
             var outputGuids = new List<Guid>();
             var rand = new Random();
             var cluster = new Cluster(rand);
-            int inputSize = data.InputWidth;
-            int outputSize = data.OutputWidth;
+            int inputSize = data.InputFeatureCount;
+            int outputSize = data.OutputFeatureCount;
 
             // Creating GUIDS for input neurons
             for (int i = 0; i < inputSize; ++i)
@@ -135,7 +134,7 @@ namespace EvolutionalNeuralNetwork
                 Entities.Add(new Entity(initialStructure, data));
 
                 Entities[i].Genes.Add((Cluster.BiasMark, Cluster.SeedGuid, cluster.RandomSynapseStrength()));
-                Entities[i].Genes.Add((Cluster.RefactoryMark, Cluster.SeedGuid, Math.Abs(cluster.RandomSynapseStrength())));
+                // Entities[i].Genes.Add((Cluster.RefactoryMark, Cluster.SeedGuid, Math.Abs(cluster.RandomSynapseStrength())));
 
                 var randInput = inputGuids[rand.Next(inputGuids.Count)];
                 var randOutput = outputGuids[rand.Next(outputGuids.Count)];

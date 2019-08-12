@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace EvolutionalNeuralNetwork
+namespace Core
 {
     public enum Mode { Grow, Balance, Shrink }
 
@@ -16,7 +16,7 @@ namespace EvolutionalNeuralNetwork
         private readonly int tournamentSize;
         private Task<Entity> overlord;
 
-        public Culture(List<Entity> _entities, DataCollection _data, int _borderStart, int _borderEnd, int _tournamentSize)
+        public Culture(List<Entity> _entities, Data _data, int _borderStart, int _borderEnd, int _tournamentSize)
         {
             entities = _entities;
             borderStart = _borderStart;
@@ -92,9 +92,9 @@ namespace EvolutionalNeuralNetwork
                 }
             }
 
-            if (position == -1 && parentIndex != borderStart)
+            if (position == -1/* && parentIndex != borderStart*/)
             {
-                if (entities[parentIndex].Equals(parent) ||
+                if (//entities[parentIndex].Equals(parent) ||
                     hunter.FitnessValue < entities[parentIndex].FitnessValue)
                     position = parentIndex;
             }
@@ -136,23 +136,20 @@ namespace EvolutionalNeuralNetwork
                 motherIndex = Tournament(father, fatherIndex, rand);
                 mother = entities[motherIndex];
 
-                var kids = mother.Copulate(father, mode, rand);
-
-                Parallel.ForEach(kids, (c) =>
+                if (mother.FitnessValue > father.FitnessValue)
                 {
-                    c.EvaluateFitness(mode, mutationRate, new Random());
-                });
+                    var t1 = mother;
+                    mother = father;
+                    father = t1;
 
-                Entity child = null;
-                double bestFitness = double.PositiveInfinity;
-                foreach(var c in kids)
-                {
-                    if (c.FitnessValue < bestFitness)
-                    {
-                        bestFitness = c.FitnessValue;
-                        child = c;
-                    }
+                    var t2 = motherIndex;
+                    motherIndex = fatherIndex;
+                    fatherIndex = t2;
                 }
+
+                var child = mother.Copulate(father, mode, rand);
+
+                child.EvaluateFitness(mode, mutationRate, rand);
 
                 int prey = Prey(child, father, fatherIndex, rand);
                 if (prey > -1)
