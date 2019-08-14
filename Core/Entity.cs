@@ -72,7 +72,7 @@ namespace Core
             Mean = mean;
             FitnessValue = Math.Pow(Math.Log(mean), 1) +
                            (cluster.NeuronCount + cluster.SynapseCount) /
-                           features.Count;
+                           (double)features.Count;
         }
 
         public void Mutate(Mode mode, double mutationRate)
