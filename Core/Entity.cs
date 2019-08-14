@@ -1,120 +1,129 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace Core
 {
     [JsonObject]
     public class Entity
     {
+        private List<Gene> _genes;
         [JsonProperty]
-        public List<Gene> Genes { get; private set; }
+        public List<Gene> Genes
+        {
+            get
+            {
+                return _genes;
+            }
+            private set
+            {
+                _genes = value;
+                _genes.Sort();
+            }
+        }
+
         [JsonProperty]
         public double FitnessValue { get; private set; } // the smaller the better
 
-        private Data dataSource;
+        public double Mean { get; private set; }
 
         public Entity() { }
 
-        public Entity(List<Gene> initialStructure, Data _dataSource, double fitness = double.PositiveInfinity)
+        public Entity(List<Gene> initialStructure, double fitness = double.PositiveInfinity)
         {
-            dataSource = _dataSource;
             Genes = new List<Gene>(initialStructure);
             FitnessValue = fitness;
         }
 
-        private double SquareSum(Cluster cluster, List<double> input, List<double> expectedOutput)
+        public void EvaluateFitness(List<Datum> features)
         {
-            double squareSum = 0;
+            var cluster = new Cluster();
+            cluster.GenerateFromStructure(Genes);
 
-            var predictedOutput = cluster.Querry(input, out long steps);
-            cluster.Nap();
-
-            if (steps == -1)
-                squareSum = double.PositiveInfinity;
-            else
+            double mean = 0;
+            for (int i = 0; i < features.Count; ++i)
             {
-                for (int i = 0; i < expectedOutput.Count; ++i)
-                    squareSum += (predictedOutput[i] - expectedOutput[i]) * (predictedOutput[i] - expectedOutput[i]);
+                var input = features[i].Input;
+                var expectedOutput = features[i].Output;
 
-                squareSum /= expectedOutput.Count;
-            }
+                double squareSum = 0;
 
-            return squareSum;
-        }
+                var predictedOutput = cluster.Querry(input, out long steps);
+                cluster.Nap();
 
-        public void EvaluateFitness()
-        {
-            EvaluateFitness(Mode.Balance, 0, new Random());
-        }
-
-        public void EvaluateFitness(Mode mode, double mutationRate, Random rand)
-        {
-            var cluster = new Cluster(rand);
-            dataSource.FetchTrainingData(out List<List<double>> input, out List<List<double>> expectedOutput, 100, false);
-
-            Genes = cluster.GenerateFromStructure(Genes, mode, mutationRate);
-
-            if (cluster.NeuronCount == 0)
-                FitnessValue = double.PositiveInfinity;
-            else
-            {
-                double[] meanSquareSums = new double[input.Count];
-                double mean = 0;
-
-                //Parallel.For(0, input.Count, (i) =>
-                for (int i = 0; i < input.Count; ++i)
+                if (steps == -1)
                 {
-                    //var cl = new Cluster(new Random());
-                    //cl.GenerateFromStructure(Genes);
-                    meanSquareSums[i] = SquareSum(cluster, input[i], expectedOutput[i]);
-                }//);
-
-                for (int i = 0; i < input.Count; ++i)
-                    mean += meanSquareSums[i];
-
-                mean /= input.Count;
-
-                FitnessValue = input.Count * Math.Pow(Math.Log(mean), 3) +
-                               cluster.NeuronCount + cluster.SynapseCount;
-            }
-        }
-
-        public bool Compatible(Entity mate)
-        {
-            if (mate.Genes.Count != Genes.Count)
-                return true;
-
-            int compatibility = 0;
-
-            foreach(var x in Genes)
-            {
-                foreach(var y in mate.Genes)
-                {
-                    if (x.Equals(y))
-                    {
-                        compatibility++;
-                        break;
-                    }
+                    FitnessValue = double.PositiveInfinity;
+                    return;
                 }
+                else
+                {
+                    for (int j = 0; j < expectedOutput.Count; ++j)
+                        squareSum += (predictedOutput[j] - expectedOutput[j]) * (predictedOutput[j] - expectedOutput[j]);
+
+                    squareSum /= expectedOutput.Count;
+                }
+
+                mean += squareSum;
             }
 
-            if (compatibility == Genes.Count)
-                return false;
+            mean /= features.Count;
 
-            return true;
+            Mean = mean;
+            FitnessValue = Math.Pow(Math.Log(mean), 1) +
+                           (cluster.NeuronCount + cluster.SynapseCount) /
+                           features.Count;
         }
 
-        public Entity Copulate(Entity father, Mode mode, Random rand)
+        public void Mutate(Mode mode, double mutationRate)
+        {
+            var cluster = new Cluster();
+            cluster.GenerateFromStructure(Genes);
+            Genes = cluster.Mutate(mode, mutationRate);
+        }
+
+        // percentage of genes that are unique between the mates
+        public double Compatibility(Entity mate)
+        {
+            double commonGenes = 0;
+
+            var motherGenes = this.Genes;
+            var fatherGenes = mate.Genes;
+
+            int m = 0, f = 0;
+            while (m < motherGenes.Count && f < fatherGenes.Count)
+            {
+                var X = motherGenes[m];
+                var Y = fatherGenes[f];
+                if (X.Source == Y.Source)
+                {
+                    if (X.Destination == Y.Destination)
+                    {
+                        commonGenes++;
+                        m++;
+                        f++;
+                    }
+                    else if (X.Destination.CompareTo(Y.Destination) < 0)
+                        m++;
+                    else
+                        f++;
+                }
+                else if (X.Source.CompareTo(Y.Source) < 0)
+                    m++;
+                else
+                    f++;
+            }
+
+            return (motherGenes.Count + fatherGenes.Count - 2 * commonGenes) / 
+                   (motherGenes.Count + fatherGenes.Count);
+        }
+
+        public Entity Copulate(Entity father, Mode mode)
         {
             Entity mother = this;
 
             var motherGenes = new List<Gene>(mother.Genes);
             var fatherGenes = new List<Gene>(father.Genes);
-
-            motherGenes.Sort();
-            fatherGenes.Sort();
 
             var commonStructure = new List<Gene>();
             var motherUniqueStructure = new List<Gene>();
@@ -176,23 +185,23 @@ namespace Core
             {
                 case Mode.Grow:
                     // more like mother
-                    return MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure, dataSource, rand);
+                    return MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure);
 
                 case Mode.Balance:
                     // exclusive more like mother
-                    return ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure, dataSource, rand);
+                    return ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure);
 
                 case Mode.Shrink:
                     // absolute more like mother
-                    return AbsoluteMoreLike(motherGenes, motherUniqueStructure, commonStructure, dataSource, rand);
+                    return AbsoluteMoreLike(motherGenes, motherUniqueStructure, commonStructure);
 
                 default: return null;
             }
         }
 
-        private Entity AbsoluteMoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> common, Data data, Random rand)
+        private Entity AbsoluteMoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> common)
         {
-            var baby = new Entity(common, data);
+            var baby = new Entity(common);
 
             int i = 0;
             int b = 0;
@@ -202,7 +211,7 @@ namespace Core
                 var B = baby.Genes[b];
                 if (X.Source == B.Source && X.Destination == B.Destination)
                 {
-                    B.Strength -= CalculateOffset(B.Strength, X.Strength, rand);
+                    B.Strength -= CalculateOffset(B.Strength, X.Strength);
                     b++;
                 }
             }
@@ -210,29 +219,29 @@ namespace Core
             return baby;
         }
 
-        private Entity ExclusiveMoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> common, Data data, Random rand)
+        private Entity ExclusiveMoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> common)
         {
-            var baby = AbsoluteMoreLike(dominant, uniqueDominant, common, data, rand);
+            var baby = AbsoluteMoreLike(dominant, uniqueDominant, common);
 
             for (int i = 0; i < uniqueDominant.Count; ++i)
             {
                 var gene = uniqueDominant[i];
-                gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2, rand);
+                gene.Strength -= CalculateOffset(gene.Strength, gene.Strength / 2);
                 baby.Genes.Add(gene);
             }
 
             return baby;
         }
 
-        private Entity MoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> uniqueRecesive, List<Gene> common, Data data, Random rand)
+        private Entity MoreLike(List<Gene> dominant, List<Gene> uniqueDominant, List<Gene> uniqueRecesive, List<Gene> common)
         {
-            var baby = ExclusiveMoreLike(dominant, uniqueDominant, common, data, rand);
+            var baby = ExclusiveMoreLike(dominant, uniqueDominant, common);
 
             for (int i = 0; i < uniqueRecesive.Count; ++i)
             {
                 var gene = uniqueRecesive[i];
                 gene.Strength /= 2;
-                gene.Strength -= CalculateOffset(gene.Strength, 0, rand);
+                gene.Strength -= CalculateOffset(gene.Strength, 0);
                 baby.Genes.Add(gene);
             }
 
@@ -240,9 +249,9 @@ namespace Core
         }
         
         // how much needs to be substracted from x to get randomly closer to target
-        private double CalculateOffset(double x, double target, Random rand)
+        private double CalculateOffset(double x, double target)
         {
-            return rand.NextDouble() * (x - target);
+            return new Random().NextDouble() * (x - target);
         }
     }
 }

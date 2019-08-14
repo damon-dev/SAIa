@@ -10,42 +10,41 @@ namespace Core
         public static readonly Guid SeedGuid = new Guid("e3ea29b5-493c-48a6-9c94-c7b418b6d732");
         public static readonly Guid BiasMark = new Guid("d579d9f1-cd6f-4236-9a66-69115ae170d3");
 
-        public List<Gene> Structure { get; private set; }
+        // Structural description of the cluster, always sorted
+        private List<Gene> _structure;
+        public List<Gene> Structure
+        {
+            get
+            {
+                return _structure;
+            }
+            private set
+            {
+                _structure = value;
+                _structure.Sort();
+            }
+        }
+
         public int SynapseCount { get; private set; }
         public int InputSize => neurons[InputGuid].Axons.Count;
         public int OutputSize => neurons[OutputGuid].Dendrites.Count;
-        public int NeuronCount => neuronGuids.Count - InputSize - OutputSize;
+        public int NeuronCount => neuronGuids.Count;
 
         private List<Guid> neuronGuids;
         private Dictionary<Guid, Neuron> neurons;
 
         private readonly Random rand;
 
-        public Cluster(Random _rand)
+        public Cluster()
         {
             neurons = new Dictionary<Guid, Neuron>();
             neuronGuids = new List<Guid>();
-            rand = _rand;
+            rand = new Random();
         }
 
-        public double RandomSynapseStrength()
-        {
-            // random value between -1 and 1
-            return rand.NextDouble() * 2 - 1;
-        }
-
-        // No mutation
-        public List<Gene> GenerateFromStructure(List<Gene> structure)
-        {
-            return GenerateFromStructure(structure, Mode.Balance, 0);
-        }
-
-        public List<Gene> GenerateFromStructure(List<Gene> structure, Mode mode, double mutationRate)
+        public void GenerateFromStructure(List<Gene> structure)
         {
             Structure = new List<Gene>(structure);
-            SynapseCount = 0;
-
-            Structure.Sort(); // makes sure the inputs are created in a consistent order
 
             neuronGuids = new List<Guid>();
             neurons = new Dictionary<Guid, Neuron>
@@ -57,6 +56,7 @@ namespace Core
                 { OutputGuid, new Neuron(OutputGuid, this, rand) }
             };
 
+            SynapseCount = 0;
             foreach (var elem in Structure)
             {
                 Guid source = elem.Source;
@@ -80,8 +80,35 @@ namespace Core
             }
 
             SynapseCount -= InputSize + OutputSize;
+        }
 
-            if (rand.NextDouble() < mutationRate && NeuronCount > 0)
+        public List<Gene> RefreshStructure()
+        {
+            var structure = new List<Gene>();
+            SynapseCount = 0;
+
+            foreach (var guid in neurons.Keys)
+            {
+                if (neurons[guid].IsRoot()) continue;
+
+                structure.Add((BiasMark, guid, neurons[guid].Bias));
+            }
+
+            foreach (var dest in neurons.Keys)
+                foreach (var source in neurons[dest].DendriteStrength)
+                {
+                    structure.Add((source.Key.Identifier, dest, source.Value));
+                    SynapseCount++;
+                }
+
+            SynapseCount -= InputSize + OutputSize;
+
+            return structure;
+        }
+
+        public List<Gene> Mutate(Mode mode, double mutationRate)
+        {
+            if (rand.NextDouble() < mutationRate)
             {
                 var list = new List<Guid>(neuronGuids);
                 double gr = (NeuronCount * .015 + 1) / NeuronCount;
@@ -94,14 +121,10 @@ namespace Core
                         {
                             MutationRate = gr,
                             NeuronCreation = .3,
-                            NeuronDeletion = .2,
-                            AxonAlteration = .4,
-                            AxonDeletion = .3,
-                            DendriteAlteration = .5,
-                            DendriteDeletion = .4,
-                            AlterationPriority = .6,
-                            AlterationMagnitude = 2,
-                            Bias = .2
+                            NeuronDeletion = .1,
+                            SynapseCreation = new double[] { .4, .4, .7, .9 },
+                            SynapseDeletion = .2,
+                            SynapseAlteration = .3
                         };
                         break;
 
@@ -111,13 +134,9 @@ namespace Core
                             MutationRate = gr,
                             NeuronCreation = .2,
                             NeuronDeletion = .2,
-                            AxonAlteration = .3,
-                            AxonDeletion = .3,
-                            DendriteAlteration = .4,
-                            DendriteDeletion = .4,
-                            AlterationPriority = .8,
-                            AlterationMagnitude = 4,
-                            Bias = .2
+                            SynapseCreation = new double[] { .3, .4, .7, .9 },
+                            SynapseDeletion = .3,
+                            SynapseAlteration = .4
                         };
                         break;
 
@@ -125,15 +144,11 @@ namespace Core
                         p = new MutationProbabilities
                         {
                             MutationRate = gr,
-                            NeuronCreation = .2,
+                            NeuronCreation = .1,
                             NeuronDeletion = .3,
-                            AxonAlteration = .3,
-                            AxonDeletion = .4,
-                            DendriteAlteration = .4,
-                            DendriteDeletion = .5,
-                            AlterationPriority = .9,
-                            AlterationMagnitude = 6,
-                            Bias = .2
+                            SynapseCreation = new double[] { .2, .4, .7, .9 },
+                            SynapseDeletion = .4,
+                            SynapseAlteration = .5
                         };
                         break;
                 }
@@ -141,39 +156,16 @@ namespace Core
                 foreach (var guid in list)
                     neurons[guid].Mutate(p);
 
-                Structure = RecreateStructure();
+                Structure = RefreshStructure();
             }
 
             return Structure;
         }
 
-        public List<Gene> RecreateStructure()
-        {
-            var structure = new List<Gene>();
-            SynapseCount = 0;
-
-            foreach(var guid in neurons.Keys)
-            {
-                if (neurons[guid].IsImmutable()) continue;
-
-                structure.Add((BiasMark, guid, neurons[guid].Bias));
-            }
-
-            foreach (var dest in neurons.Keys)
-                foreach (var source in neurons[dest].Dendrites)
-                {
-                    SynapseCount++;
-                    structure.Add((source.Key.Identifier, dest, source.Value));
-                }
-
-            SynapseCount -= InputSize + OutputSize;
-            structure.Sort();
-
-            return structure;
-        }
-
         public Neuron GetNeuron(Guid id)
         {
+            if (!neurons.ContainsKey(id)) return null;
+
             return neurons[id];
         }
 
@@ -199,6 +191,8 @@ namespace Core
 
         public Neuron RandomNeuron()
         {
+            if (neuronGuids.Count == 0) return null;
+
             int index = rand.Next(0, neuronGuids.Count);
 
             return neurons[neuronGuids[index]];
@@ -213,11 +207,11 @@ namespace Core
                 var outputNeurons = new List<Gene>();
                 var outputs = new List<double>();
 
-                foreach (var key in neurons[OutputGuid].Dendrites.Keys)
+                foreach (var neuron in neurons[OutputGuid].Dendrites)
                 {
-                    double response = key.Signal;
+                    double response = neuron.Signal;
 
-                    outputNeurons.Add((key.Identifier, OutputGuid, response)); // adding signal instead of strength as its what represents the output
+                    outputNeurons.Add((neuron.Identifier, OutputGuid, response)); // adding signal instead of strength as its what represents the output
                 }
 
                 outputNeurons.Sort(); // makes sure the order is correct related to the input
@@ -235,7 +229,7 @@ namespace Core
         {
             // BIG TODO: implement synaptic plasticity here
             foreach (var neuron in neurons.Values)
-                neuron.Fire(-2, 0);
+                neuron.Clean();
         }
 
         /// <summary>
@@ -244,7 +238,7 @@ namespace Core
         /// <returns>True if the graph has a cycle, false if the graph is a tree.</returns>
         private void Propagate(List<double> inputs, out long steps)
         {
-            var queue = new Queue<(Neuron, long)>();
+            var queue = new Queue<(Neuron next, long depth)>();
             steps = 0;
 
             // baking the inputs into the input neuron axons
@@ -252,18 +246,20 @@ namespace Core
             {
                 var inputNeuron = neurons[InputGuid].Axons[i];
 
-                inputNeuron.Fire(-1, inputs[i]);
-
-                foreach (var successor in inputNeuron.Axons)
+                if (inputNeuron.Fire(-1, inputs[i]))
                 {
-                    queue.Enqueue((successor, inputNeuron.Depth));
+                    steps++;
+                    foreach (var successor in inputNeuron.Axons)
+                    {
+                        queue.Enqueue((successor, inputNeuron.Depth));
+                    }
                 }
             }
 
-            while (queue.Count > 0 && queue.Peek().Item2 < NeuronCount * 5)
+            while (queue.Count > 0 && queue.Peek().depth < NeuronCount * 2)
             {
-                var nextNeuron = queue.Peek().Item1;
-                var fromDepth = queue.Dequeue().Item2;
+                var nextNeuron = queue.Peek().next;
+                var fromDepth = queue.Dequeue().depth;
 
                 if (nextNeuron.Fire(fromDepth))
                 {

@@ -8,8 +8,7 @@ namespace CLI
 
     public class DisplayProtocol
     {
-        protected List<List<double>> input;
-        protected List<List<double>> expectedOutput;
+        protected List<Datum> features;
 
         public DisplayProtocol()
         {

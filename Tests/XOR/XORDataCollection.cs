@@ -7,7 +7,7 @@ namespace Tests.XOR
     {
         public XORDataCollection()
         {
-            TrainingInput = new List<List<double>>
+            Training = new List<List<double>>
             {
                 new List<double> {0, 0},
                 new List<double> {0, 1},
@@ -23,7 +23,7 @@ namespace Tests.XOR
                 new List<double> {0}
             };
 
-            InputFeatureCount = TrainingInput[0].Count;
+            InputFeatureCount = Training[0].Count;
             OutputFeatureCount = TrainingOutput[0].Count;
         }
     }

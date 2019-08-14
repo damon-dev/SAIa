@@ -6,10 +6,10 @@ namespace CLI.MNIST
 {
     public class MNISTDisplayProtocol : DisplayProtocol
     {
-        public MNISTDisplayProtocol(MNISTDataCollection data)
+        public MNISTDisplayProtocol(MNISTDataCollection dataCollection)
         {
             //data.FetchTestData(out input, out expectedOutput, 100);
-            data.FetchTrainingData(out input, out expectedOutput, 100, false);
+            dataCollection.FetchTrainingData(out features, 10, false);
         }
 
         public override void Display(Entity champion)
@@ -18,26 +18,29 @@ namespace CLI.MNIST
 
             if (champion == null || champion.FitnessValue == double.PositiveInfinity) return;
 
-            var cluster = new Cluster(new Random());
+            var cluster = new Cluster();
             cluster.GenerateFromStructure(champion.Genes);
 
             double totalSteps = 0;
             double[] errorRate = new double[10];
             double[] totalElements = new double[10];
 
-            for (int i = 0; i < input.Count; i++)
+            for (int i = 0; i < features.Count; i++)
             {
-                var preditcedOutput = cluster.Querry(input[i], out long steps);
+                var input = features[i].Input;
+                var expectedOutput = features[i].Output;
+
+                var preditcedOutput = cluster.Querry(input, out long steps);
                 cluster.Nap();
                 if (preditcedOutput != null)
-                    errorRate[(int)(expectedOutput[i][0] * 10)] += (preditcedOutput[0] - expectedOutput[i][0]) * (preditcedOutput[0] - expectedOutput[i][0]);
+                    errorRate[(int)(expectedOutput[0] * 10)] += (preditcedOutput[0] - expectedOutput[0]) * (preditcedOutput[0] - expectedOutput[0]);
                 else
-                    errorRate[(int)(expectedOutput[i][0] * 10)] += 1;
-                totalElements[(int)(expectedOutput[i][0] * 10)]++;
+                    errorRate[(int)(expectedOutput[0] * 10)] += 1;
+                totalElements[(int)(expectedOutput[0] * 10)]++;
                 totalSteps += steps;
             }
 
-            totalSteps /= input.Count;
+            totalSteps /= features.Count;
 
             for (int i = 0; i < 10; ++i)
             {

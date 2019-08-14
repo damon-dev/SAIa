@@ -8,7 +8,6 @@ namespace Tests.XOR
     [TestClass]
     public class XORTest : IObserver<Entity>
     {
-        Data data;
         List<List<double>> input;
         List<List<double>> expectedOutput;
 
@@ -16,66 +15,28 @@ namespace Tests.XOR
         const int size = 50;
         IDisposable stopper;
         Entity currentChampion;
+        Incubator incubator;
 
         [TestMethod]
         public void XOR()
         {
-            var data = new MNISTDataCollection();
+            var data = new XORDataCollection();
 
             data.FetchTrainingData(out input, out expectedOutput);
+            
+            incubator = new Incubator(data);
 
-            program.displayProtocol = new MNISTDisplayProtocol(data);
-            var incubator = new Incubator(data);
+            stopper = incubator.Subscribe(this);
 
-            program.stopper = incubator.Subscribe(program);
-
-            program.displayProtocol.Display(null);
-
-            switch (program.displayProtocol.ReadResponse())
-            {
-                case Response.Load:
-                    incubator.Populate(true, threadCount, size);
-                    incubator.Start();
-                    break;
-
-                case Response.Train:
-                    incubator.Populate(false, threadCount, size);
-                    incubator.Start();
-                    break;
-
-                default:
-                    return;
-            }
-
-            Response response;
-            while ((response = program.displayProtocol.ReadResponse()) != Response.Quit)
-            {
-                switch (response)
-                {
-                    case Response.Train:
-                        program.stopper = incubator.Subscribe(program);
-                        incubator.Start();
-                        break;
-
-                    case Response.Stop:
-                        incubator.Stop(true);
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-
-            incubator.Stop(false);
+            incubator.Populate(false, 4, size);
+            incubator.Start();
         }
 
         public void Display(Entity champion)
         {
-            base.Display(champion);
-
             if (champion == null || champion.FitnessValue == double.PositiveInfinity) return;
 
-            var cluster = new Cluster(new Random());
+            var cluster = new Cluster();
             cluster.GenerateFromStructure(champion.Genes);
 
             double totalSteps = 0;
@@ -111,8 +72,11 @@ namespace Tests.XOR
                 entity.FitnessValue < currentChampion.FitnessValue)
             {
                 currentChampion = entity;
-                displayProtocol.Display(entity);
+                Display(entity);
             }
+
+            if (entity.FitnessValue < -10000)
+                incubator.Stop(false);
         }
     }
 }

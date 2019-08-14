@@ -1,4 +1,5 @@
 ﻿using CLI.MNIST;
+using CLI.XOR;
 using Core;
 using System;
 
@@ -10,28 +11,28 @@ namespace CLI
         private const int size = 50;
         private IDisposable stopper;
         private Entity currentChampion;
-        private MNISTDisplayProtocol displayProtocol;
+        private XORDisplayProtocol displayProtocol;
 
         static void Main(string[] args)
         {
             var program = new Program();
-            var data = new MNISTDataCollection();
-            program.displayProtocol = new MNISTDisplayProtocol(data);
-            var incubator = new Incubator(data);
-
-            program.stopper = incubator.Subscribe(program);
+            var data = new XORDataCollection();
+            program.displayProtocol = new XORDisplayProtocol(data);
+            Incubator incubator;
 
             program.displayProtocol.Display(null);
 
             switch(program.displayProtocol.ReadResponse())
             {
                 case Response.Load:
-                    incubator.Populate(true, threadCount, size);
+                    incubator = new Incubator(data, true, threadCount, size);
+                    program.stopper = incubator.Subscribe(program);
                     incubator.Start();
                     break;
 
                 case Response.Train:
-                    incubator.Populate(false, threadCount, size);
+                    incubator = new Incubator(data, false, threadCount, size);
+                    program.stopper = incubator.Subscribe(program);
                     incubator.Start();
                     break;
 

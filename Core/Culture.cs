@@ -10,21 +10,26 @@ namespace Core
     {
         public Entity Champion => entities[borderStart];
 
-        private List<Entity> entities;
         private readonly int borderStart;
         private readonly int borderEnd;
         private readonly int tournamentSize;
-        private Task<Entity> overlord;
+        private readonly List<Datum> features;
 
-        public Culture(List<Entity> _entities, Data _data, int _borderStart, int _borderEnd, int _tournamentSize)
+        private List<Entity> entities;
+        private Task<Entity> overlord;
+        private Random rand;
+
+        public Culture(List<Entity> _entities, List<Datum> _features, int _borderStart, int _borderEnd, int _tournamentSize)
         {
             entities = _entities;
             borderStart = _borderStart;
             borderEnd = _borderEnd;
             tournamentSize = _tournamentSize;
+            features = _features;
+            rand = new Random();
         }
 
-        private int Tournament(Entity mate, int mateIndex, Random rand)
+        private int Tournament(Entity mate, int mateIndex)
         {
             int position = -1;
             double bestFitnes = double.PositiveInfinity;
@@ -37,13 +42,15 @@ namespace Core
                 while(index == mateIndex)
                     index = rand.Next(borderStart, borderEnd);
 
+                double compatibility = mate.Compatibility(entities[index]);
+
                 if (entities[index].FitnessValue < bestFitnes &&
-                    mate.Compatible(entities[index]))
+                    compatibility > double.Epsilon && compatibility < 0.01)
                 {
                     bestFitnes = entities[index].FitnessValue;
                     position = index;
                 }
-                else if (entities[index].FitnessValue < alrightFitness)
+                else if (entities[index].FitnessValue < alrightFitness && compatibility < 0.25)
                 {
                     alrightFitness = entities[index].FitnessValue;
                     alrightPosition = index;
@@ -63,7 +70,7 @@ namespace Core
             return position;
         }
 
-        private int Prey(Entity hunter, Entity parent, int parentIndex, Random rand)
+        private int Prey(Entity hunter, Entity parent, int parentIndex)
         {
             if (hunter == null) return -1;
 
@@ -80,7 +87,7 @@ namespace Core
                     index = rand.Next(borderStart, borderEnd);
 
                 if (entities[index].FitnessValue > hunter.FitnessValue &&
-                    !hunter.Compatible(entities[index]))
+                    hunter.Compatibility(entities[index]) < double.Epsilon)
                 {
                     position = index;
                     break;
@@ -92,21 +99,44 @@ namespace Core
                 }
             }
 
-            if (position == -1/* && parentIndex != borderStart*/)
-            {
-                if (//entities[parentIndex].Equals(parent) ||
-                    hunter.FitnessValue < entities[parentIndex].FitnessValue)
-                    position = parentIndex;
-            }
-
             if (position == -1)
             {
-                int index = rand.Next(entities.Count);
-                if (hunter.FitnessValue < entities[index].FitnessValue)
-                    position = index;
+                if (hunter.FitnessValue < entities[parentIndex].FitnessValue)
+                    position = parentIndex;
+                else
+                {
+                    int index = rand.Next(entities.Count);
+                    if (hunter.FitnessValue < entities[index].FitnessValue)
+                        position = index;
+                }
             }
 
             return position;
+        }
+
+        public Task<Entity> EvaluateAll()
+        {
+            if (overlord != null && !overlord.IsCompleted)
+                return overlord;
+
+            overlord = Task.Run(() =>
+            {
+                for (int i = borderStart; i < borderEnd; ++i)
+                {
+                    entities[i].EvaluateFitness(features);
+
+                    if (entities[i].FitnessValue < entities[borderStart].FitnessValue)
+                    {
+                        var t = entities[borderStart];
+                        entities[borderStart] = entities[i];
+                        entities[i] = t;
+                    }
+                }
+
+                return entities[borderStart];
+            });
+
+            return overlord;
         }
 
         public Task<Entity> Develop(Mode mode, double mutationRate)
@@ -120,8 +150,6 @@ namespace Core
 
                 Entity mother = null;
                 Entity father = null;
-
-                var rand = new Random();
                 
                 int competition = rand.Next(borderStart, borderEnd);
                 fatherIndex = rand.Next(borderStart, borderEnd);
@@ -133,7 +161,7 @@ namespace Core
                     father = entities[fatherIndex];
                 }
 
-                motherIndex = Tournament(father, fatherIndex, rand);
+                motherIndex = Tournament(father, fatherIndex);
                 mother = entities[motherIndex];
 
                 if (mother.FitnessValue > father.FitnessValue)
@@ -147,11 +175,13 @@ namespace Core
                     fatherIndex = t2;
                 }
 
-                var child = mother.Copulate(father, mode, rand);
+                var child = mother.Copulate(father, mode);
 
-                child.EvaluateFitness(mode, mutationRate, rand);
+                child.Mutate(mode, mutationRate);
 
-                int prey = Prey(child, father, fatherIndex, rand);
+                child.EvaluateFitness(features);
+
+                int prey = Prey(child, father, fatherIndex);
                 if (prey > -1)
                     entities[prey] = child;
 

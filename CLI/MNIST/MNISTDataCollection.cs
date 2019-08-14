@@ -16,25 +16,19 @@ namespace CLI.MNIST
 
             foreach (var image in MnistReader.ReadTrainingData())
             {
-                TrainingInput.Add(ProcessImage(image.Data));
-                TrainingOutput.Add(ProcessLabel(image.Label));
-                trainingKeep[image.Label].Add(TrainingInput.Count - 1);
+                Training.Add(new Datum(ProcessImage(image.Data), ProcessLabel(image.Label)));
+                trainingKeep[image.Label].Add(Training.Count - 1);
             }
         
             foreach (var image in MnistReader.ReadTestData())
             {
-                TestInput.Add(ProcessImage(image.Data));
-                TestOutput.Add(ProcessLabel(image.Label));
+                Test.Add(new Datum(ProcessImage(image.Data), ProcessLabel(image.Label)));
             }
-
-            InputFeatureCount = TrainingInput[0].Count;
-            OutputFeatureCount = TrainingOutput[0].Count;
         }
 
-        public override void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count, bool random)
+        public override void FetchTrainingData(out List<Datum> data, int count, bool random)
         {
-            input = new List<List<double>>();
-            output = new List<List<double>>();
+            data = new List<Datum>();
 
             var rand = new Random();
             var used = new HashSet<int>();
@@ -61,23 +55,20 @@ namespace CLI.MNIST
                         index = trainingKeep[k][i];
 
                     used.Add(index);
-                    input.Add(TrainingInput[index]);
-                    output.Add(TrainingOutput[index]);
+                    data.Add(Training[index]);
                 }
             }
         }
 
-        public override void FetchTestData(out List<List<double>> input, out List<List<double>> output, int count)
+        public override void FetchTestData(out List<Datum> data, int count)
         {
-            input = new List<List<double>>();
-            output = new List<List<double>>();
+            data = new List<Datum>();
 
-            if (count <= 0 || count > TestInput.Count) count = TestInput.Count;
+            if (count <= 0 || count > Test.Count) count = Test.Count;
 
             for (int i = 0; i < count; ++i)
             {
-                input.Add(TestInput[i]);
-                output.Add(TestOutput[i]);
+                data.Add(Test[i]);
             }
         }
 

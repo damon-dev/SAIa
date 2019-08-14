@@ -6,37 +6,46 @@ using System.Linq;
 
 namespace Core
 {
+    public class Datum
+    {
+        public List<double> Input { get; set; }
+        public List<double> Output { get; set; }
+
+        public Datum()
+        {
+            Input = new List<double>();
+            Output = new List<double>();
+        }
+
+        public Datum(List<double> input, List<double> output)
+        {
+            Input = input;
+            Output = output;
+        }
+    }
+
     public class Data
     {
-        // TODO: able to change from the program
         private const string genealogyPath = "Geneaology/culture.json";
 
-        public int InputFeatureCount { get; protected set; }
-        public int OutputFeatureCount { get; protected set; }
-
-        protected List<List<double>> TrainingInput;
-        protected List<List<double>> TrainingOutput;
-        protected List<List<double>> TestInput;
-        protected List<List<double>> TestOutput;
+        protected List<Datum> Training;
+        protected List<Datum> Test;
 
         public Data()
         {
-            TrainingInput = new List<List<double>>();
-            TrainingOutput = new List<List<double>>();
-            TestInput = new List<List<double>>();
-            TestOutput = new List<List<double>>();
+            Training = new List<Datum>();
+            Test = new List<Datum>();
         }
 
-        public virtual void FetchTrainingData(out List<List<double>> input, out List<List<double>> output, int count = 0, bool random = false)
+        public virtual void FetchTrainingData(out List<Datum> data, int count = 0, bool random = false)
         {
-            if (count <= 0 || count > TrainingInput.Count)
-                count = TrainingInput.Count;
+            if (count <= 0 || count > Training.Count)
+                count = Training.Count;
 
-            if (count > TrainingInput.Count / 2 && random)
+            if (count > Training.Count / 2 && random)
                 throw new ArgumentException(nameof(count), "If random is true, no more than half of the training samples are allowed to be requested.");
 
-            input = new List<List<double>>();
-            output = new List<List<double>>();
+            data = new List<Datum>();
 
             var rand = new Random();
             var used = new HashSet<int>();
@@ -46,26 +55,24 @@ namespace Core
                 int index;
                 if (random)
                 {
-                    index = rand.Next(TrainingInput.Count);
+                    index = rand.Next(Training.Count);
                     while (used.Contains(index))
-                        index = rand.Next(TrainingInput.Count);
+                        index = rand.Next(Training.Count);
                 }
                 else
                     index = i;
 
                 used.Add(index);
-                input.Add(TrainingInput[index]);
-                output.Add(TrainingOutput[index]);
+                data.Add(Training[index]);
             }
         }
 
-        public virtual void FetchTestData(out List<List<double>> input, out List<List<double>> output, int count)
+        public virtual void FetchTestData(out List<Datum> data, int count)
         {
-            if (count <= 0 || count > TestInput.Count)
-                count = TestInput.Count;
+            if (count <= 0 || count > Test.Count)
+                count = Test.Count;
 
-            input = TestInput.Take(count).ToList();
-            output = TestOutput.Take(count).ToList();
+            data = Test.Take(count).ToList();
         }
 
         public bool LoadEntities(out List<Entity> entities, int count = 0)
@@ -84,9 +91,7 @@ namespace Core
                 if (count <= 0 || count > container.Entities.Length)
                     count =  container.Entities.Length;
 
-                entities = container.Entities.Select(e => new Entity(e.Genes, this, e.FitnessValue))
-                                                 .Take(count)
-                                                 .ToList();
+                entities = container.Entities.Take(count).ToList();
                 return true;
             }
             catch (Exception)
