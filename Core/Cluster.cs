@@ -33,13 +33,10 @@ namespace Core
         private List<Guid> neuronGuids;
         private Dictionary<Guid, Neuron> neurons;
 
-        private readonly Random rand;
-
         public Cluster()
         {
             neurons = new Dictionary<Guid, Neuron>();
             neuronGuids = new List<Guid>();
-            rand = new Random();
         }
 
         public void GenerateFromStructure(List<Gene> structure)
@@ -50,10 +47,10 @@ namespace Core
             neurons = new Dictionary<Guid, Neuron>
             {
                 // Adding the input refference
-                { InputGuid, new Neuron(InputGuid, this, rand) },
+                { InputGuid, new Neuron(InputGuid, this) },
 
                 // Adding the output refference
-                { OutputGuid, new Neuron(OutputGuid, this, rand) }
+                { OutputGuid, new Neuron(OutputGuid, this) }
             };
 
             SynapseCount = 0;
@@ -65,10 +62,10 @@ namespace Core
 
                 if (!neurons.ContainsKey(source))
                     if (source != BiasMark)
-                        RegisterNeuron(new Neuron(source, this, rand));
+                        RegisterNeuron(new Neuron(source, this));
 
                 if (!neurons.ContainsKey(dest))
-                    RegisterNeuron(new Neuron(dest, this, rand));
+                    RegisterNeuron(new Neuron(dest, this));
 
                 if (source == BiasMark)
                     neurons[dest].Bias = strength;
@@ -108,7 +105,7 @@ namespace Core
 
         public List<Gene> Mutate(Mode mode, double mutationRate)
         {
-            if (rand.NextDouble() < mutationRate)
+            if (R.NG.NextDouble() < mutationRate)
             {
                 var list = new List<Guid>(neuronGuids);
                 double gr = (NeuronCount * .015 + 1) / NeuronCount;
@@ -193,7 +190,7 @@ namespace Core
         {
             if (neuronGuids.Count == 0) return null;
 
-            int index = rand.Next(0, neuronGuids.Count);
+            int index = R.NG.Next(neuronGuids.Count);
 
             return neurons[neuronGuids[index]];
         }

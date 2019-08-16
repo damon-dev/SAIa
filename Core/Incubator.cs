@@ -50,9 +50,9 @@ namespace Core
             // TEMPORARY
             var modes = new List<(Mode, double)>
             {
-                (Mode.Balance, 0.3),
+                (Mode.Balance, 0.2),
                 (Mode.Shrink, 0.4),
-                (Mode.Grow, 0.4),
+                (Mode.Grow, 0.3),
                 (Mode.Balance, 0.5),
             };
             // *********
@@ -115,7 +115,6 @@ namespace Core
             var initialStructure = new List<Gene>();
             var inputGuids = new List<Guid>();
             var outputGuids = new List<Guid>();
-            var rand = new Random();
 
             // Creating GUIDS for input neurons
             for (int i = 0; i < inputSize; ++i)
@@ -137,12 +136,12 @@ namespace Core
             {
                 Entities.Add(new Entity(initialStructure));
 
-                Entities[i].Genes.Add((Cluster.BiasMark, Cluster.SeedGuid, Neuron.RandomSynapseStrength(rand)));
+                Entities[i].Genes.Add((Cluster.BiasMark, Cluster.SeedGuid, Neuron.RandomSynapseStrength()));
 
-                var randInput = inputGuids[rand.Next(inputGuids.Count)];
-                var randOutput = outputGuids[rand.Next(outputGuids.Count)];
-                Entities[i].Genes.Add((randInput, Cluster.SeedGuid, Neuron.RandomSynapseStrength(rand)));
-                Entities[i].Genes.Add((Cluster.SeedGuid, randOutput, Neuron.RandomSynapseStrength(rand)));
+                var randInput = inputGuids[R.NG.Next(inputGuids.Count)];
+                var randOutput = outputGuids[R.NG.Next(outputGuids.Count)];
+                Entities[i].Genes.Add((randInput, Cluster.SeedGuid, Neuron.RandomSynapseStrength()));
+                Entities[i].Genes.Add((Cluster.SeedGuid, randOutput, Neuron.RandomSynapseStrength()));
             }
         }
     }

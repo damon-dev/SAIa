@@ -251,7 +251,7 @@ namespace Core
         // how much needs to be substracted from x to get randomly closer to target
         private double CalculateOffset(double x, double target)
         {
-            return new Random().NextDouble() * (x - target);
+            return R.NG.NextDouble() * (x - target);
         }
     }
 }

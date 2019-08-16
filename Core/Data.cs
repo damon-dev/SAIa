@@ -47,7 +47,6 @@ namespace Core
 
             data = new List<Datum>();
 
-            var rand = new Random();
             var used = new HashSet<int>();
 
             for (int i = 0; i < count; ++i)
@@ -55,9 +54,9 @@ namespace Core
                 int index;
                 if (random)
                 {
-                    index = rand.Next(Training.Count);
+                    index = R.NG.Next(Training.Count);
                     while (used.Contains(index))
-                        index = rand.Next(Training.Count);
+                        index = R.NG.Next(Training.Count);
                 }
                 else
                     index = i;

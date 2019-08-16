@@ -17,7 +17,6 @@ namespace Core
 
         private List<Entity> entities;
         private Task<Entity> overlord;
-        private Random rand;
 
         public Culture(List<Entity> _entities, List<Datum> _features, int _borderStart, int _borderEnd, int _tournamentSize)
         {
@@ -26,7 +25,6 @@ namespace Core
             borderEnd = _borderEnd;
             tournamentSize = _tournamentSize;
             features = _features;
-            rand = new Random();
         }
 
         private int Tournament(Entity mate, int mateIndex)
@@ -38,9 +36,9 @@ namespace Core
 
             for (int i = 0; i < tournamentSize; ++i)
             {
-                int index = rand.Next(borderStart, borderEnd);
+                int index = R.NG.Next(borderStart, borderEnd);
                 while(index == mateIndex)
-                    index = rand.Next(borderStart, borderEnd);
+                    index = R.NG.Next(borderStart, borderEnd);
 
                 double compatibility = mate.Compatibility(entities[index]);
 
@@ -59,9 +57,9 @@ namespace Core
 
             if (position == -1)
             {
-                position = rand.Next(entities.Count);
+                position = R.NG.Next(entities.Count);
                 while (position == mateIndex)
-                    position = rand.Next(entities.Count);
+                    position = R.NG.Next(entities.Count);
 
                 if (entities[position].FitnessValue > alrightFitness)
                     position = alrightPosition;
@@ -82,9 +80,9 @@ namespace Core
 
             for (int i = 0; i < tournamentSize; ++i)
             {
-                int index = rand.Next(borderStart, borderEnd);
+                int index = R.NG.Next(borderStart, borderEnd);
                 while (index == parentIndex)
-                    index = rand.Next(borderStart, borderEnd);
+                    index = R.NG.Next(borderStart, borderEnd);
 
                 if (entities[index].FitnessValue > hunter.FitnessValue &&
                     hunter.Compatibility(entities[index]) < double.Epsilon)
@@ -105,7 +103,7 @@ namespace Core
                     position = parentIndex;
                 else
                 {
-                    int index = rand.Next(entities.Count);
+                    int index = R.NG.Next(entities.Count);
                     if (hunter.FitnessValue < entities[index].FitnessValue)
                         position = index;
                 }
@@ -151,8 +149,8 @@ namespace Core
                 Entity mother = null;
                 Entity father = null;
                 
-                int competition = rand.Next(borderStart, borderEnd);
-                fatherIndex = rand.Next(borderStart, borderEnd);
+                int competition = R.NG.Next(borderStart, borderEnd);
+                fatherIndex = R.NG.Next(borderStart, borderEnd);
                 father = entities[fatherIndex];
 
                 if (entities[competition].FitnessValue < father.FitnessValue)
