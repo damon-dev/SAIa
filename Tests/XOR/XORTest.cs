@@ -34,7 +34,7 @@ namespace Tests.XOR
 
         public void Display(Entity champion)
         {
-            if (champion == null || champion.FitnessValue == double.PositiveInfinity) return;
+            if (champion == null || champion.Fitness == double.PositiveInfinity) return;
 
             var cluster = new Cluster();
             cluster.GenerateFromStructure(champion.Genes);
@@ -52,7 +52,7 @@ namespace Tests.XOR
 
             totalSteps /= input.Count;
 
-            Console.WriteLine($"Fitness: {champion.FitnessValue:0.00}    ");
+            Console.WriteLine($"Fitness: {champion.Fitness:0.00}    ");
             Console.WriteLine($"Steps: {totalSteps:0.00}      ");
             Console.SetCursorPosition(0, Console.CursorTop - input.Count - 4);
         }
@@ -69,13 +69,13 @@ namespace Tests.XOR
         public void OnNext(Entity entity)
         {
             if (currentChampion == null ||
-                entity.FitnessValue < currentChampion.FitnessValue)
+                entity.Fitness < currentChampion.Fitness)
             {
                 currentChampion = entity;
                 Display(entity);
             }
 
-            if (entity.FitnessValue < -10000)
+            if (entity.Fitness < -10000)
                 incubator.Stop(false);
         }
     }

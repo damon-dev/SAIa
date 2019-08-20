@@ -12,11 +12,11 @@ namespace CLI.XOR
             dataCollection.FetchTrainingData(out features, 10, false);
         }
 
-        public override void Display(Entity champion)
+        public override void Display(Entity champion, CultureConfiguration cfg)
         {
-            base.Display(champion);
+            base.Display(champion, cfg);
 
-            if (champion == null || champion.FitnessValue == double.PositiveInfinity) return;
+            if (champion == null || champion.Mean == double.PositiveInfinity) return;
 
             var cluster = new Cluster();
             cluster.GenerateFromStructure(champion.Genes);
@@ -36,7 +36,7 @@ namespace CLI.XOR
 
             totalSteps /= features.Count;
 
-            Console.WriteLine($"Fitness: {champion.FitnessValue:0.00}    ");
+            Console.WriteLine($"Mean error: {champion.Mean:0.00000}    ");
             Console.WriteLine($"Steps: {totalSteps:0.00}      ");
             Console.SetCursorPosition(0, Console.CursorTop - features.Count - 4);
         }

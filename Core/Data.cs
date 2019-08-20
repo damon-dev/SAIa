@@ -31,6 +31,9 @@ namespace Core
         protected List<Datum> Training;
         protected List<Datum> Test;
 
+        public int InputFeatureCount { get; set; }
+        public int OutputFeatureCount { get; set; }
+
         public Data()
         {
             Training = new List<Datum>();

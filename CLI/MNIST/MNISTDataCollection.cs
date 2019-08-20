@@ -24,6 +24,9 @@ namespace CLI.MNIST
             {
                 Test.Add(new Datum(ProcessImage(image.Data), ProcessLabel(image.Label)));
             }
+
+            InputFeatureCount = Training[0].Input.Count;
+            OutputFeatureCount = Training[0].Output.Count;
         }
 
         public override void FetchTrainingData(out List<Datum> data, int count, bool random)
@@ -33,30 +36,28 @@ namespace CLI.MNIST
             var rand = new Random();
             var used = new HashSet<int>();
 
-            if (count <= 0 || count > 100) count = 100;
+            if (count <= 0 || count > Training.Count) count = Training.Count;
 
-            for (int k = 0; k < 10; k++)
+            for (int i = 0; i < count; ++i)
             {
-                for (int i = 0; i < count / 10; ++i)
+                int index;
+                int k = i % 10;
+                if (random)
                 {
-                    int index;
-                    if (random)
+                    int r = rand.Next(trainingKeep[k].Count);
+                    index = trainingKeep[k][r];
+
+                    while (used.Contains(index))
                     {
-                        int r = rand.Next(trainingKeep[k].Count);
+                        r = rand.Next(trainingKeep[k].Count);
                         index = trainingKeep[k][r];
-
-                        while (used.Contains(index))
-                        {
-                            r = rand.Next(trainingKeep[k].Count);
-                            index = trainingKeep[k][r];
-                        }
                     }
-                    else
-                        index = trainingKeep[k][i];
-
-                    used.Add(index);
-                    data.Add(Training[index]);
                 }
+                else
+                    index = trainingKeep[k][i / 10];
+
+                used.Add(index);
+                data.Add(Training[index]);
             }
         }
 
@@ -84,7 +85,7 @@ namespace CLI.MNIST
 
         private List<double> ProcessLabel(byte label)
         {
-            /*
+            
             var list = new List<double>();
 
             for (int i = 0; i < 10; ++i)
@@ -97,9 +98,9 @@ namespace CLI.MNIST
 
 
             return list;
-            */
+            
 
-            return new List<double> { (double)label / 10 };
+            //return new List<double> { (double)label / 10 };
         }
     }
 }

@@ -21,65 +21,117 @@ namespace Core
                 _genes.Sort();
             }
         }
-
         [JsonProperty]
-        public double FitnessValue { get; private set; } // the smaller the better
-
         public double Mean { get; private set; }
+        [JsonProperty]
+        public int FeaturesUsed { get; private set; }
+        [JsonProperty]
+        public int ChildCount { get; private set; }
+        [JsonProperty]
+        public bool Positive { get; private set; }
+
+        public double Fitness { get; private set; } // the smaller the better
+        public int NeuronCount { get; private set; }
+        public int SynapseCount { get; private set; }
+        public int InputSize { get; private set; }
+        public int OutputSize { get; private set; }
 
         public Entity() { }
 
-        public Entity(List<Gene> initialStructure, double fitness = double.PositiveInfinity)
+        public Entity(List<Gene> structure)
         {
-            Genes = new List<Gene>(initialStructure);
-            FitnessValue = fitness;
-        }
+            Genes = new List<Gene>(structure);
 
-        public void EvaluateFitness(List<Datum> features)
-        {
             var cluster = new Cluster();
             cluster.GenerateFromStructure(Genes);
+            NeuronCount = cluster.NeuronCount;
+            SynapseCount = cluster.SynapseCount;
 
-            double mean = 0;
-            for (int i = 0; i < features.Count; ++i)
+            InputSize = cluster.InputSize;
+            OutputSize = cluster.OutputSize;
+
+            Mean = double.PositiveInfinity;
+            Fitness = double.PositiveInfinity;
+        }
+
+        public double ComputeFitness(Func<Entity, int, double> fitnessFunction)
+        {
+            if (FeaturesUsed == 0)
+                return double.PositiveInfinity;
+
+            return fitnessFunction(this, FeaturesUsed);
+        }
+
+        public void Evaluate(List<Datum> features, Func<Entity, int, double> fitnessFunction, bool cumulative, 
+            Func<List<double>, List<double>, bool> successCondition)
+        {
+            if (cumulative)
+                Mean = Mean * FeaturesUsed;
+            else
+                Mean = FeaturesUsed = 0;
+
+            if (features?.Count > 0)
             {
-                var input = features[i].Input;
-                var expectedOutput = features[i].Output;
+                var cluster = new Cluster();
+                cluster.GenerateFromStructure(Genes);
 
-                double squareSum = 0;
+                if (!cumulative)
+                    Positive = true;
 
-                var predictedOutput = cluster.Querry(input, out long steps);
-                cluster.Nap();
-
-                if (steps == -1)
+                for (int i = 0; i < features.Count; ++i)
                 {
-                    FitnessValue = double.PositiveInfinity;
-                    return;
-                }
-                else
-                {
-                    for (int j = 0; j < expectedOutput.Count; ++j)
-                        squareSum += (predictedOutput[j] - expectedOutput[j]) * (predictedOutput[j] - expectedOutput[j]);
+                    var input = features[i].Input;
+                    var expectedOutput = features[i].Output;
 
-                    squareSum /= expectedOutput.Count;
+                    double squareSum = 0;
+
+                    var predictedOutput = cluster.Querry(input, out long steps);
+                    cluster.Nap();
+
+                    if (steps == -1)
+                    {
+                        Mean = double.PositiveInfinity;
+                        Positive = false;
+                        return;
+                    }
+                    else
+                    {
+                        for (int j = 0; j < expectedOutput.Count; ++j)
+                            squareSum += (predictedOutput[j] - expectedOutput[j]) * (predictedOutput[j] - expectedOutput[j]);
+                        
+                        Positive = Positive && successCondition(expectedOutput, predictedOutput);
+                        squareSum /= expectedOutput.Count;
+                    }
+
+                    Mean += squareSum;
                 }
 
-                mean += squareSum;
+                FeaturesUsed += features.Count;
             }
 
-            mean /= features.Count;
-
-            Mean = mean;
-            FitnessValue = Math.Pow(Math.Log(mean), 1) +
-                           (cluster.NeuronCount + cluster.SynapseCount) /
-                           (double)features.Count;
+            if (FeaturesUsed > 0)
+            {
+                Mean /= FeaturesUsed;
+                Fitness = fitnessFunction(this, FeaturesUsed);
+            }
+            else
+            {
+                Mean = double.PositiveInfinity;
+                Fitness = double.PositiveInfinity;
+            }
         }
 
-        public void Mutate(Mode mode, double mutationRate)
+        public void Mutate(NeuronMutationProbabilities p, double mutationRate)
         {
             var cluster = new Cluster();
             cluster.GenerateFromStructure(Genes);
-            Genes = cluster.Mutate(mode, mutationRate);
+            Genes = cluster.Mutate(p, mutationRate);
+            NeuronCount = cluster.NeuronCount;
+            SynapseCount = cluster.SynapseCount;
+
+            // TODO: these shouldn't change ever, check if do
+            InputSize = cluster.InputSize;
+            OutputSize = cluster.OutputSize;
         }
 
         // percentage of genes that are unique between the mates
@@ -118,9 +170,19 @@ namespace Core
                    (motherGenes.Count + fatherGenes.Count);
         }
 
-        public Entity Copulate(Entity father, Mode mode)
+        public Entity Copulate(Entity father, CultureConfiguration fatherCfg)
         {
             Entity mother = this;
+
+            if (mother.ComputeFitness(fatherCfg.FitnessFunction) > father.Fitness)
+            {
+                var t1 = mother;
+                mother = father;
+                father = t1;
+            }
+
+            mother.ChildCount++;
+            father.ChildCount++;
 
             var motherGenes = new List<Gene>(mother.Genes);
             var fatherGenes = new List<Gene>(father.Genes);
@@ -181,17 +243,17 @@ namespace Core
             }
 
             // father is the weaker one
-            switch (mode)
+            switch (fatherCfg.Mode)
             {
-                case Mode.Grow:
+                case Modes.Grow:
                     // more like mother
                     return MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure);
 
-                case Mode.Balance:
+                case Modes.Balance:
                     // exclusive more like mother
                     return ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure);
 
-                case Mode.Shrink:
+                case Modes.Shrink:
                     // absolute more like mother
                     return AbsoluteMoreLike(motherGenes, motherUniqueStructure, commonStructure);
 

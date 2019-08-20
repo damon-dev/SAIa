@@ -7,20 +7,20 @@ namespace CLI
 {
     class Program : IObserver<Entity>
     {
-        private const int threadCount = 4;
+        private const int threadCount = 5;
         private const int size = 50;
         private IDisposable stopper;
         private Entity currentChampion;
-        private XORDisplayProtocol displayProtocol;
+        private MNISTDisplayProtocol displayProtocol;
 
         static void Main(string[] args)
         {
             var program = new Program();
-            var data = new XORDataCollection();
-            program.displayProtocol = new XORDisplayProtocol(data);
+            var data = new MNISTDataCollection();
+            program.displayProtocol = new MNISTDisplayProtocol(data);
             Incubator incubator;
 
-            program.displayProtocol.Display(null);
+            program.displayProtocol.Display(null, null);
 
             switch(program.displayProtocol.ReadResponse())
             {
@@ -73,11 +73,14 @@ namespace CLI
 
         public void OnNext(Entity entity)
         {
+            var cfg = CultureConfiguration.Shrink;
+
             if (currentChampion == null ||
-                entity.FitnessValue < currentChampion.FitnessValue)
+                entity.Mean < currentChampion.Mean ||
+                entity.FeaturesUsed > currentChampion.FeaturesUsed)
             {
                 currentChampion = entity;
-                displayProtocol.Display(entity);
+                displayProtocol.Display(entity, cfg);
             }
         }
     }

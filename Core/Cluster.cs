@@ -79,7 +79,7 @@ namespace Core
             SynapseCount -= InputSize + OutputSize;
         }
 
-        public List<Gene> RefreshStructure()
+        public List<Gene> RecreateStructure()
         {
             var structure = new List<Gene>();
             SynapseCount = 0;
@@ -103,57 +103,17 @@ namespace Core
             return structure;
         }
 
-        public List<Gene> Mutate(Mode mode, double mutationRate)
+        public List<Gene> Mutate(NeuronMutationProbabilities p, double mutationRate)
         {
             if (R.NG.NextDouble() < mutationRate)
             {
                 var list = new List<Guid>(neuronGuids);
-                double gr = (NeuronCount * .015 + 1) / NeuronCount;
-
-                var p = new MutationProbabilities();
-                switch (mode)
-                {
-                    case Mode.Grow:
-                        p = new MutationProbabilities
-                        {
-                            MutationRate = gr,
-                            NeuronCreation = .3,
-                            NeuronDeletion = .1,
-                            SynapseCreation = new double[] { .4, .4, .7, .9 },
-                            SynapseDeletion = .2,
-                            SynapseAlteration = .3
-                        };
-                        break;
-
-                    case Mode.Balance:
-                        p = new MutationProbabilities
-                        {
-                            MutationRate = gr,
-                            NeuronCreation = .2,
-                            NeuronDeletion = .2,
-                            SynapseCreation = new double[] { .3, .4, .7, .9 },
-                            SynapseDeletion = .3,
-                            SynapseAlteration = .4
-                        };
-                        break;
-
-                    case Mode.Shrink:
-                        p = new MutationProbabilities
-                        {
-                            MutationRate = gr,
-                            NeuronCreation = .1,
-                            NeuronDeletion = .3,
-                            SynapseCreation = new double[] { .2, .4, .7, .9 },
-                            SynapseDeletion = .4,
-                            SynapseAlteration = .5
-                        };
-                        break;
-                }
+                double gr = (NeuronCount * p.MutationRate + 1) / NeuronCount;
 
                 foreach (var guid in list)
-                    neurons[guid].Mutate(p);
+                    neurons[guid].Mutate(p, gr);
 
-                Structure = RefreshStructure();
+                Structure = RecreateStructure();
             }
 
             return Structure;

@@ -15,9 +15,9 @@ namespace CLI
             Console.CursorVisible = false;
         }
 
-        public virtual void Display(Entity champion)
+        public virtual void Display(Entity champion, CultureConfiguration cfg)
         {
-            if (champion == null || champion.FitnessValue == double.PositiveInfinity)
+            if (champion == null || champion.Fitness == double.PositiveInfinity)
             {
                 Console.WriteLine("T: Train L: Load S: Stop Q: Quit");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);

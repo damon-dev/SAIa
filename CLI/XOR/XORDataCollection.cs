@@ -14,6 +14,9 @@ namespace CLI.XOR
                 new Datum(new List<double> {1, 0}, new List<double> {1}),
                 new Datum(new List<double> {1, 1}, new List<double> {0})
             };
+
+            InputFeatureCount = 2;
+            OutputFeatureCount = 1;
         }
     }
 }

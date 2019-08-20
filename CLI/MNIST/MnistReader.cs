@@ -28,24 +28,29 @@ namespace CLI.MNIST
 
         private static IEnumerable<ByteImage> Read(string imagesPath, string labelsPath)
         {
-            var labels = new BinaryReader(new FileStream(labelsPath, FileMode.Open));
-            var images = new BinaryReader(new FileStream(imagesPath, FileMode.Open));
-
-            int magicNumber = images.ReadBigInt32();
-            int numberOfImages = images.ReadBigInt32();
-            int width = images.ReadBigInt32();
-            int height = images.ReadBigInt32();
-
-            int magicLabel = labels.ReadBigInt32();
-            int numberOfLabels = labels.ReadBigInt32();
-
-            for (int i = 0; i < numberOfImages; i++)
+            using (var labelStream = new FileStream(labelsPath, FileMode.Open))
+            using (var imageStream = new FileStream(imagesPath, FileMode.Open))
             {
-                yield return new ByteImage()
+                using (var labels = new BinaryReader(labelStream))
+                using (var images = new BinaryReader(imageStream))
                 {
-                    Data = images.ReadBytes(width * height),
-                    Label = labels.ReadByte()
-                };
+                    int magicNumber = images.ReadBigInt32();
+                    int numberOfImages = images.ReadBigInt32();
+                    int width = images.ReadBigInt32();
+                    int height = images.ReadBigInt32();
+
+                    int magicLabel = labels.ReadBigInt32();
+                    int numberOfLabels = labels.ReadBigInt32();
+
+                    for (int i = 0; i < numberOfImages; i++)
+                    {
+                        yield return new ByteImage()
+                        {
+                            Data = images.ReadBytes(width * height),
+                            Label = labels.ReadByte()
+                        };
+                    }
+                }
             }
         }
     }
