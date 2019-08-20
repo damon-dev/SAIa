@@ -136,6 +136,18 @@ namespace Core
                 return;
 
             double percent = R.NG.NextDouble();
+            if (percent < p.NeuronCreation)
+            {
+                percent = R.NG.NextDouble();
+                if (percent < 0.4 && !IsInputNeuron() && !IsOutputNeuron()) // creates neuron on the same depth as this one
+                    SpawnNeuronFromNeuron();
+                else if (percent < 0.7 && !IsInputNeuron())
+                    SpawnNeuronFromDendrite(RandomDendrite());
+                else if (!IsOutputNeuron())
+                    SpawnNeuronFromAxon(RandomAxon());
+            }
+
+            percent = R.NG.NextDouble();
             if (percent < p.SynapseDeletion / 2)
             {
                 if (Dendrites.Count > 0)
@@ -275,18 +287,6 @@ namespace Core
                     neuron = parentCluster.RandomNeuron();
 
                 CreateAxon(neuron, RandomSynapseStrength());
-            }
-
-            percent = R.NG.NextDouble();
-            if (percent < p.NeuronCreation)
-            {
-                percent = R.NG.NextDouble();
-                if (percent < 0.4 && !IsInputNeuron() && !IsOutputNeuron()) // creates neuron on the same depth as this one
-                    SpawnNeuronFromNeuron();
-                else if (percent < 0.7 && !IsInputNeuron())
-                    SpawnNeuronFromDendrite(RandomDendrite());
-                else if (!IsOutputNeuron())
-                    SpawnNeuronFromAxon(RandomAxon());
             }
 
             percent = R.NG.NextDouble();
