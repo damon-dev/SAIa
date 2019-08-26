@@ -8,7 +8,7 @@ namespace Core
     /// </summary>
     /// 
     [Serializable]
-    public struct Gene : IComparable<Gene>, IEquatable<Gene> ,ISerializable
+    public struct Gene : IComparable<Gene>, IEquatable<Gene>, ISerializable
     {
         public Guid Source { get; set; }
         public Guid Destination { get; set; }

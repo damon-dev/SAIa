@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -7,6 +8,8 @@ namespace Core
     // ／人◕ ‿‿ ◕人＼ Contract?
     public class Incubator : IObservable<Entity>
     {
+        public static ConcurrentDictionary<(Guid, Guid), Guid> MutationCatalog;
+
         private bool isRunning;
         private Data dataCollection;
         private List<IObserver<Entity>> observers;
@@ -16,6 +19,9 @@ namespace Core
         public Incubator(Data _data, bool fromSaved, int cultureCount, int cultureSize)
         {
             observers = new List<IObserver<Entity>>();
+
+            if (MutationCatalog == null)
+                MutationCatalog = new ConcurrentDictionary<(Guid, Guid), Guid>();
 
             dataCollection = _data;
             isRunning = false;
@@ -35,6 +41,7 @@ namespace Core
         public void Populate(bool fromSaved, int cultureCount, int cultureSize)
         {
             List<Entity> entities;
+
             if (fromSaved)
                 dataCollection.LoadEntities(out entities);
             else
@@ -42,30 +49,41 @@ namespace Core
 
             // TODO: ******** TEMPORARY ********
             cultures = new List<Culture>();
-            var cfg = new CultureConfiguration(CultureConfiguration.Grow);
+            var cfg = new CultureConfiguration(CultureConfiguration.Shrink);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
             cultures.Add(new Culture(this, cfg));
 
             cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cultures.Add(new Culture(this, cfg));
-
-            cfg = new CultureConfiguration(CultureConfiguration.Shrink);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
             cultures.Add(new Culture(this, cfg));
 
             cfg = new CultureConfiguration(CultureConfiguration.Balance);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
+            cultures.Add(new Culture(this, cfg));
+
+            cfg = new CultureConfiguration(CultureConfiguration.Balance);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
             cultures.Add(new Culture(this, cfg));
 
             cfg = new CultureConfiguration(CultureConfiguration.Grow);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
             cultures.Add(new Culture(this, cfg));
             // *********************************
 
             for (int i = 0; i < cultureCount; ++i)
             {
                 for (int j = 0; j < cultureSize; ++j)
+                {
                     cultures[i].Entities.Add(entities[cultureSize * i + j]);
+                    entities[cultureSize * i + j].HostCulture = cultures[i];
+                }
+            }
 
-                if (fromSaved)
+            if (fromSaved)
+            {
+                foreach (var culture in cultures)
                     foreach (var observer in observers)
-                        observer.OnNext(cultures[i].Champion);
+                        observer.OnNext(culture.Entities[0]);
             }
         }
 
@@ -74,7 +92,7 @@ namespace Core
             if (isRunning) return;
 
             isRunning = true;
-            int startingFeatures = 1;
+            int startingFeatures = 10;
 
             overlords = new Dictionary<Task<Entity>, Culture>();
             dataCollection.FetchTrainingData(out List<Datum> features, startingFeatures, false);
@@ -110,7 +128,7 @@ namespace Core
                 var culture = overlords[completed];
                 overlords.Remove(completed);
 
-                if (!result.Positive)
+                if (!result.Successful)
                     overlords.Add(culture.Develop(features), culture);
                 else
                 {
@@ -164,22 +182,25 @@ namespace Core
 
             // Linking input neurons to the reference node and the seed node
             foreach (var iGuid in inputGuids)
+            {
+                initialStructure.Add((Cluster.BiasMark, iGuid, 0));
                 initialStructure.Add((Cluster.InputGuid, iGuid, 0));
+            }
 
             // Linking output neurons to the reference node and the seed node
             foreach (var oGuid in outputGuids)
+            {
+                initialStructure.Add((Cluster.BiasMark, oGuid, 0));
                 initialStructure.Add((oGuid, Cluster.OutputGuid, 0));
+            }
 
-            // TODO: check if input/output nodes need random bias
             for (int i = 0; i < entityCount; ++i)
             {
                 var randInput = inputGuids[R.NG.Next(inputGuids.Count)];
                 var randOutput = outputGuids[R.NG.Next(outputGuids.Count)];
                 var genes = new List<Gene>(initialStructure)
                 {
-                    (Cluster.BiasMark, Cluster.SeedGuid, Neuron.RandomSynapseStrength()),
-                    (randInput, Cluster.SeedGuid, Neuron.RandomSynapseStrength()),
-                    (Cluster.SeedGuid, randOutput, Neuron.RandomSynapseStrength())
+                    (randInput, randOutput, Neuron.RandomSynapseStrength())
                 };
 
                 entities.Add(new Entity(genes));

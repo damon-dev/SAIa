@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Core
 {
@@ -17,12 +16,12 @@ namespace Core
     public class Neuron
     {
         public Guid Identifier { get; private set; }
-        public Dictionary<Neuron, double> DendriteStrength { get; set; }
+        public Dictionary<Neuron, double> DendriteWeights { get; set; }
         public List<Neuron> Dendrites{ get; set; }
         public List<Neuron> Axons { get; set; }
         public double Bias { get; set; }
         public long Depth { get; set; }
-        public double Signal { get; set; }
+        public double? Signal { get; set; }
 
         private Cluster parentCluster;
     
@@ -50,7 +49,7 @@ namespace Core
         public Neuron(Guid guid, Cluster _parentCluster)
         {
             Identifier = guid;
-            DendriteStrength = new Dictionary<Neuron, double>();
+            DendriteWeights = new Dictionary<Neuron, double>();
             Dendrites = new List<Neuron>();
             Axons = new List<Neuron>();
 
@@ -61,7 +60,7 @@ namespace Core
 
         public void Clean()
         {
-            Signal = 0;
+            Signal = null;
             threshold = 0;
             Depth = int.MinValue;
         }
@@ -85,10 +84,10 @@ namespace Core
                 foreach (var dendrite in Dendrites)
                 {
                     if (dendrite.Depth == incomingSignalDepth)
-                        signal += dendrite.Signal * DendriteStrength[dendrite];
+                        signal += dendrite.Signal.GetValueOrDefault() * DendriteWeights[dendrite];
                 }
-                if (DendriteStrength.ContainsKey(this))
-                    signal += Signal * DendriteStrength[this];
+                if (DendriteWeights.ContainsKey(this))
+                    signal += Signal.GetValueOrDefault() * DendriteWeights[this];
             }
 
             return Activate(signal, incomingSignalDepth);
@@ -111,12 +110,12 @@ namespace Core
 
         public bool IsInputNeuron()
         {
-            return DendriteStrength.ContainsKey(parentCluster.GetNeuron(Cluster.InputGuid));
+            return DendriteWeights.ContainsKey(parentCluster.GetNeuron(Cluster.InputGuid));
         }
 
         public bool IsOutputNeuron()
         {
-            return parentCluster.GetNeuron(Cluster.OutputGuid).DendriteStrength.ContainsKey(this);
+            return parentCluster.GetNeuron(Cluster.OutputGuid).DendriteWeights.ContainsKey(this);
         }
 
         // the IO reference neuron
@@ -136,19 +135,33 @@ namespace Core
                 return;
 
             double percent = R.NG.NextDouble();
-            if (percent < p.NeuronCreation)
+            if (percent < p.NeuronCreation) // creates new neuron
             {
                 percent = R.NG.NextDouble();
-                if (percent < 0.4 && !IsInputNeuron() && !IsOutputNeuron()) // creates neuron on the same depth as this one
-                    SpawnNeuronFromNeuron();
-                else if (percent < 0.7 && !IsInputNeuron())
-                    SpawnNeuronFromDendrite(RandomDendrite());
-                else if (!IsOutputNeuron())
-                    SpawnNeuronFromAxon(RandomAxon());
+                if (percent < .5 && Dendrites.Count > 0)
+                {
+                    int i;
+                    Neuron dendrite = null;
+                    for (i = 0, dendrite = RandomDendrite();
+                        !dendrite.IsRoot() && i < 3;
+                        i++, dendrite = RandomDendrite());
+
+                    SpawnNeuronFromDendrite(dendrite);
+                }
+                else if (Axons.Count > 0)
+                {
+                    int i;
+                    Neuron axon = null;
+                    for (i = 0, axon = RandomAxon();
+                        !axon.IsRoot() && i < 3;
+                        i++, axon = RandomAxon());
+
+                    SpawnNeuronFromAxon(axon);
+                }
             }
 
             percent = R.NG.NextDouble();
-            if (percent < p.SynapseDeletion / 2)
+            if (percent < p.SynapseDeletion / 2) // deletes dendrite
             {
                 if (Dendrites.Count > 0)
                 {
@@ -161,7 +174,7 @@ namespace Core
             }
 
             percent = R.NG.NextDouble();
-            if (percent < p.SynapseDeletion / 2)
+            if (percent < p.SynapseDeletion / 2) // deletes axon
             {
                 if (Axons.Count > 0)
                 {
@@ -189,48 +202,10 @@ namespace Core
                     {
                         if (neuron.Identifier == Identifier || R.NG.Next(Dendrites.Count + 1) == Dendrites.Count)
                             Bias = RandomSynapseStrength();
-                            //Bias = (Bias + RandomSynapseStrength()) / 2;
                         else
-                            DendriteStrength[neuron] = RandomSynapseStrength();
-                            //DendriteStrength[neuron] = (DendriteStrength[neuron] + RandomSynapseStrength()) / 2;
+                            DendriteWeights[neuron] = RandomSynapseStrength();
                     }
                 }
-            }
-
-            percent = R.NG.NextDouble();
-            if (percent < p.SynapseCreation / 2) // dendrite creation
-            {
-                int i = 0;
-                Neuron neuron = parentCluster.RandomNeuron();
-                //TODO: Remove hardcoded values
-                if (Dendrites.Count != 0)
-                {
-                    percent = R.NG.NextDouble();
-                    if (percent < 0.51879) // creates dendrite on an existing dendrite depth
-                        for (i = 0, neuron = RandomStepUp(this, 1); 
-                            i < 3 && DendriteStrength.ContainsKey(neuron); 
-                            ++i, neuron = RandomStepUp(this, 1));
-
-                    if (percent < 0.78793 || DendriteStrength.ContainsKey(neuron)) // creates dendrite on a level above
-                        for (i = 0, neuron = RandomStepUp(this, 2);
-                            i < 3 && DendriteStrength.ContainsKey(neuron);
-                            ++i, neuron = RandomStepUp(this, 2));
-
-                    if (percent < 0.92756 || DendriteStrength.ContainsKey(neuron)) // creates dendrite on same level as this neuron
-                        for (i = 0, neuron = RandomStepUp(this, 0);
-                            i < 3 && DendriteStrength.ContainsKey(neuron);
-                            ++i, neuron = RandomStepUp(this, 0));
-
-                    else if (DendriteStrength.ContainsKey(neuron))// creates dendrite to a random neuron
-                        for (i = 0, neuron = parentCluster.RandomNeuron();
-                            i < 3 && DendriteStrength.ContainsKey(neuron);
-                            ++i, neuron = parentCluster.RandomNeuron()) ;
-                }
-
-                if (neuron.IsRoot())
-                    neuron = parentCluster.RandomNeuron();
-
-                CreateDendrite(neuron, RandomSynapseStrength());
             }
 
             percent = R.NG.NextDouble();
@@ -247,10 +222,45 @@ namespace Core
 
                     if (!neuron.IsRoot())
                     {
-                        neuron.DendriteStrength[this] = RandomSynapseStrength();
-                        //neuron.DendriteStrength[this] = (RandomSynapseStrength() + neuron.DendriteStrength[this]) / 2;
+                        neuron.DendriteWeights[this] = RandomSynapseStrength();
                     }
                 }
+            }
+
+            percent = R.NG.NextDouble();
+            if (percent < p.SynapseCreation / 2) // dendrite creation
+            {
+                int i = 0;
+                Neuron neuron = parentCluster.RandomNeuron();
+                //TODO: Remove hardcoded values
+                if (Dendrites.Count != 0)
+                {
+                    percent = R.NG.NextDouble();
+                    if (percent < 0.51879) // creates dendrite on an existing dendrite depth
+                        for (i = 0, neuron = RandomStepUp(this, 1); 
+                            i < 3 && DendriteWeights.ContainsKey(neuron); 
+                            ++i, neuron = RandomStepUp(this, 1));
+
+                    if (percent < 0.78793 || DendriteWeights.ContainsKey(neuron)) // creates dendrite on a level above
+                        for (i = 0, neuron = RandomStepUp(this, 2);
+                            i < 3 && DendriteWeights.ContainsKey(neuron);
+                            ++i, neuron = RandomStepUp(this, 2));
+
+                    if (percent < 0.92756 || DendriteWeights.ContainsKey(neuron)) // creates dendrite on same level as this neuron
+                        for (i = 0, neuron = RandomStepUp(this, 0);
+                            i < 3 && DendriteWeights.ContainsKey(neuron);
+                            ++i, neuron = RandomStepUp(this, 0));
+
+                    else if (DendriteWeights.ContainsKey(neuron))// creates dendrite to a random neuron
+                        for (i = 0, neuron = parentCluster.RandomNeuron();
+                            i < 3 && DendriteWeights.ContainsKey(neuron);
+                            ++i, neuron = parentCluster.RandomNeuron());
+                }
+
+                if (neuron.IsRoot())
+                    neuron = parentCluster.RandomNeuron();
+
+                CreateDendrite(neuron, RandomSynapseStrength());
             }
 
             percent = R.NG.NextDouble();
@@ -264,23 +274,23 @@ namespace Core
                     percent = R.NG.NextDouble();
                     if (percent < 0.51879) // creates axon on an existing axon depth
                         for (i = 0, neuron = RandomStepDown(this, 1);
-                            i < 3 && neuron.DendriteStrength.ContainsKey(this);
-                            ++i, neuron = RandomStepDown(this, 1)) ;
+                            i < 3 && neuron.DendriteWeights.ContainsKey(this);
+                            ++i, neuron = RandomStepDown(this, 1));
 
-                    if (percent < 0.78793 || neuron.DendriteStrength.ContainsKey(this)) // creates axon on a level bellow
+                    if (percent < 0.78793 || neuron.DendriteWeights.ContainsKey(this)) // creates axon on a level bellow
                         for (i = 0, neuron = RandomStepDown(this, 2);
-                            i < 3 && neuron.DendriteStrength.ContainsKey(this);
-                            ++i, neuron = RandomStepDown(this, 2)) ;
+                            i < 3 && neuron.DendriteWeights.ContainsKey(this);
+                            ++i, neuron = RandomStepDown(this, 2));
 
-                    if (percent < 0.92756 || neuron.DendriteStrength.ContainsKey(this)) // creates axon on same level as this neuron
+                    if (percent < 0.92756 || neuron.DendriteWeights.ContainsKey(this)) // creates axon on same level as this neuron
                         for (i = 0, neuron = RandomStepDown(this, 0);
-                            i < 3 && neuron.DendriteStrength.ContainsKey(this);
-                            ++i, neuron = RandomStepDown(this, 0)) ;
+                            i < 3 && neuron.DendriteWeights.ContainsKey(this);
+                            ++i, neuron = RandomStepDown(this, 0));
 
-                    if (neuron.DendriteStrength.ContainsKey(this)) // creates axon to a random neuron
+                    if (neuron.DendriteWeights.ContainsKey(this)) // creates axon to a random neuron
                         for (i = 0, neuron = parentCluster.RandomNeuron();
-                            i < 3 && neuron.DendriteStrength.ContainsKey(this);
-                            ++i, neuron = parentCluster.RandomNeuron()) ;
+                            i < 3 && neuron.DendriteWeights.ContainsKey(this);
+                            ++i, neuron = parentCluster.RandomNeuron());
                 }
 
                 if (neuron.IsRoot())
@@ -299,11 +309,11 @@ namespace Core
 
         public void ForceCreateDendrite(Neuron source, double strength)
         {
-            if (DendriteStrength.ContainsKey(source))
-                DendriteStrength[source] = strength;
+            if (DendriteWeights.ContainsKey(source))
+                DendriteWeights[source] = strength;
             else
             {
-                DendriteStrength.Add(source, strength);
+                DendriteWeights.Add(source, strength);
                 Dendrites.Add(source);
                 source.Axons.Add(this);
             }
@@ -322,7 +332,7 @@ namespace Core
             if (origin == null || IsRoot() || origin.IsRoot())
                 return;
 
-            DendriteStrength.Remove(origin);
+            DendriteWeights.Remove(origin);
             Dendrites.Remove(origin);
             origin.Axons.Remove(this);
         }
@@ -332,11 +342,11 @@ namespace Core
             if (destination == null || IsRoot() || destination.IsRoot())
                 return;
 
-            if (destination.DendriteStrength.ContainsKey(this))
-                destination.DendriteStrength[this] = strength;
+            if (destination.DendriteWeights.ContainsKey(this))
+                destination.DendriteWeights[this] = strength;
             else
             {
-                destination.DendriteStrength.Add(this, strength);
+                destination.DendriteWeights.Add(this, strength);
                 destination.Dendrites.Add(this);
                 Axons.Add(destination);
             }
@@ -347,34 +357,9 @@ namespace Core
             if (destination == null || IsRoot() || destination.IsRoot())
                 return;
 
-            destination.DendriteStrength.Remove(this);
+            destination.DendriteWeights.Remove(this);
             destination.Dendrites.Remove(this);
             Axons.Remove(destination);
-        }
-
-        public void SpawnNeuronFromNeuron()
-        {
-            if (IsInputNeuron() || IsOutputNeuron())
-                return;
-
-            var neuron = new Neuron(Guid.NewGuid(), parentCluster);
-
-            if (parentCluster.RegisterNeuron(neuron))
-            {
-                var dendrite = RandomDendrite();
-                var axon = RandomAxon();
-
-                if (dendrite != null)
-                {
-                    DendriteStrength[dendrite] /= 2;
-                    neuron.CreateDendrite(dendrite, DendriteStrength[dendrite]);
-                }
-
-                if (axon != null)
-                {
-                    neuron.CreateAxon(axon, axon.DendriteStrength[this]);
-                }
-            }
         }
 
         public void SpawnNeuronFromDendrite(Neuron dendrite)
@@ -382,11 +367,15 @@ namespace Core
             if (dendrite == null || dendrite.IsRoot())
                 return;
 
-            var neuron = new Neuron(Guid.NewGuid(), parentCluster);
+            var guid = Guid.NewGuid();
+
+            guid = Incubator.MutationCatalog.GetOrAdd((dendrite.Identifier, Identifier), guid);
+
+            var neuron = new Neuron(guid, parentCluster);
 
             if (parentCluster.RegisterNeuron(neuron))
             {
-                var oldStrength = DendriteStrength[dendrite];
+                var oldStrength = DendriteWeights[dendrite];
                 RemoveDendrite(dendrite);
 
                 neuron.CreateDendrite(dendrite, 1);
@@ -399,11 +388,15 @@ namespace Core
             if (axon == null || axon.IsRoot())
                 return;
 
-            var neuron = new Neuron(Guid.NewGuid(), parentCluster);
+            var guid = Guid.NewGuid();
+
+            guid = Incubator.MutationCatalog.GetOrAdd((Identifier, axon.Identifier), guid);
+
+            var neuron = new Neuron(guid, parentCluster);
 
             if (parentCluster.RegisterNeuron(neuron))
             {
-                var oldStrength = axon.DendriteStrength[this];
+                var oldStrength = axon.DendriteWeights[this];
                 RemoveAxon(axon);
 
                 CreateAxon(neuron, 1);
@@ -422,7 +415,7 @@ namespace Core
                     foreach (var axon in Axons)
                     {
                         if (dendrite.Identifier != Identifier && axon.Identifier != Identifier)
-                            axon.CreateDendrite(dendrite, DendriteStrength[dendrite] * axon.DendriteStrength[this]);
+                            axon.CreateDendrite(dendrite, DendriteWeights[dendrite] * axon.DendriteWeights[this]);
                     }
 
                     dendrite.Axons.Remove(this);
@@ -431,7 +424,7 @@ namespace Core
                 foreach (var axon in Axons)
                 {
                     axon.Dendrites.Remove(this);
-                    axon.DendriteStrength.Remove(this);
+                    axon.DendriteWeights.Remove(this);
                 }
             }
         }

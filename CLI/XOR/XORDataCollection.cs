@@ -1,4 +1,5 @@
 ﻿using Core;
+using System;
 using System.Collections.Generic;
 
 namespace CLI.XOR
@@ -17,6 +18,14 @@ namespace CLI.XOR
 
             InputFeatureCount = 2;
             OutputFeatureCount = 1;
+
+            SuccessCondition = (expected, predicted) =>
+            {
+                if (Math.Abs(predicted[0] - expected[0]) < .0001)
+                    return true;
+
+                return false;
+            };
         }
     }
 }

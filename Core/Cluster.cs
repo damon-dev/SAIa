@@ -7,7 +7,6 @@ namespace Core
     {
         public static readonly Guid InputGuid = new Guid("8478a94f-5a4a-4d6c-a3f8-16b7fb4ad2c6");
         public static readonly Guid OutputGuid = new Guid("7bd1acb4-07ba-4838-be56-237d3391b61f");
-        public static readonly Guid SeedGuid = new Guid("e3ea29b5-493c-48a6-9c94-c7b418b6d732");
         public static readonly Guid BiasMark = new Guid("d579d9f1-cd6f-4236-9a66-69115ae170d3");
 
         // Structural description of the cluster, always sorted
@@ -28,22 +27,22 @@ namespace Core
         public int SynapseCount { get; private set; }
         public int InputSize => neurons[InputGuid].Axons.Count;
         public int OutputSize => neurons[OutputGuid].Dendrites.Count;
-        public int NeuronCount => neuronGuids.Count;
+        public int NeuronCount => activeNeuronGuids.Count;
 
-        private List<Guid> neuronGuids;
+        private List<Guid> activeNeuronGuids;
         private Dictionary<Guid, Neuron> neurons;
 
         public Cluster()
         {
             neurons = new Dictionary<Guid, Neuron>();
-            neuronGuids = new List<Guid>();
+            activeNeuronGuids = new List<Guid>();
         }
 
         public void GenerateFromStructure(List<Gene> structure)
         {
             Structure = new List<Gene>(structure);
 
-            neuronGuids = new List<Guid>();
+            activeNeuronGuids = new List<Guid>();
             neurons = new Dictionary<Guid, Neuron>
             {
                 // Adding the input refference
@@ -92,7 +91,7 @@ namespace Core
             }
 
             foreach (var dest in neurons.Keys)
-                foreach (var source in neurons[dest].DendriteStrength)
+                foreach (var source in neurons[dest].DendriteWeights)
                 {
                     structure.Add((source.Key.Identifier, dest, source.Value));
                     SynapseCount++;
@@ -103,17 +102,21 @@ namespace Core
             return structure;
         }
 
-        public List<Gene> Mutate(NeuronMutationProbabilities p, double mutationRate)
+        public List<Gene> Mutate(NeuronMutationProbabilities p, double mutationRate, out bool hasMutated)
         {
+            hasMutated = false;
+
             if (R.NG.NextDouble() < mutationRate)
             {
-                var list = new List<Guid>(neuronGuids);
+                var list = new List<Guid>(activeNeuronGuids);
                 double gr = (NeuronCount * p.MutationRate + 1) / NeuronCount;
 
                 foreach (var guid in list)
                     neurons[guid].Mutate(p, gr);
 
                 Structure = RecreateStructure();
+
+                hasMutated = true;
             }
 
             return Structure;
@@ -131,7 +134,7 @@ namespace Core
             if (neurons.ContainsKey(neuron.Identifier)) return false;
 
             neurons.Add(neuron.Identifier, neuron);
-            neuronGuids.Add(neuron.Identifier);
+            activeNeuronGuids.Add(neuron.Identifier);
 
             return true;
         }
@@ -141,18 +144,18 @@ namespace Core
             if (!neurons.ContainsKey(neuron.Identifier)) return false;
 
             neurons.Remove(neuron.Identifier);
-            neuronGuids.Remove(neuron.Identifier);
+            activeNeuronGuids.Remove(neuron.Identifier);
 
             return true;
         }
 
         public Neuron RandomNeuron()
         {
-            if (neuronGuids.Count == 0) return null;
+            if (activeNeuronGuids.Count == 0) return null;
 
-            int index = R.NG.Next(neuronGuids.Count);
+            int index = R.NG.Next(activeNeuronGuids.Count);
 
-            return neurons[neuronGuids[index]];
+            return neurons[activeNeuronGuids[index]];
         }
 
         public List<double> Querry(List<double> inputs, out long steps)
@@ -161,20 +164,14 @@ namespace Core
 
             if (steps >= 0)
             {
-                var outputNeurons = new List<Gene>();
                 var outputs = new List<double>();
 
                 foreach (var neuron in neurons[OutputGuid].Dendrites)
                 {
-                    double response = neuron.Signal;
+                    double response = neuron.Signal.GetValueOrDefault();
 
-                    outputNeurons.Add((neuron.Identifier, OutputGuid, response)); // adding signal instead of strength as its what represents the output
+                    outputs.Add(response); 
                 }
-
-                outputNeurons.Sort(); // makes sure the order is correct related to the input
-
-                foreach (var neuron in outputNeurons)
-                    outputs.Add(neuron.Strength);
 
                 return outputs;
             }

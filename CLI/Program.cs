@@ -8,7 +8,7 @@ namespace CLI
     class Program : IObserver<Entity>
     {
         private const int threadCount = 5;
-        private const int size = 50;
+        private const int size = 100;
         private IDisposable stopper;
         private Entity currentChampion;
         private MNISTDisplayProtocol displayProtocol;
@@ -76,7 +76,7 @@ namespace CLI
             var cfg = CultureConfiguration.Shrink;
 
             if (currentChampion == null ||
-                entity.Mean < currentChampion.Mean ||
+                entity.Fitness < currentChampion.Fitness ||
                 entity.FeaturesUsed > currentChampion.FeaturesUsed)
             {
                 currentChampion = entity;

@@ -1,10 +1,11 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Core
 {
-    [JsonObject]
+    [JsonObject(MemberSerialization.OptIn)]
     public class Entity
     {
         private List<Gene> _genes;
@@ -22,19 +23,23 @@ namespace Core
             }
         }
         [JsonProperty]
-        public double Mean { get; private set; }
+        public double Fitness { get; private set; }
         [JsonProperty]
         public int FeaturesUsed { get; private set; }
         [JsonProperty]
         public int ChildCount { get; private set; }
         [JsonProperty]
-        public bool Positive { get; private set; }
+        public Guid Species { get; set; }
 
-        public double Fitness { get; private set; } // the smaller the better
+        public Culture HostCulture { get; set; }
+
         public int NeuronCount { get; private set; }
         public int SynapseCount { get; private set; }
+
         public int InputSize { get; private set; }
         public int OutputSize { get; private set; }
+
+        public bool Successful { get; private set; }
 
         public Entity() { }
 
@@ -50,25 +55,24 @@ namespace Core
             InputSize = cluster.InputSize;
             OutputSize = cluster.OutputSize;
 
-            Mean = double.PositiveInfinity;
             Fitness = double.PositiveInfinity;
         }
 
-        public double ComputeFitness(Func<Entity, int, double> fitnessFunction)
+        public double SharedFitness()
         {
-            if (FeaturesUsed == 0)
-                return double.PositiveInfinity;
+            if (!HostCulture.SpeciesCatalog.TryGetValue(Species, out var species))
+                return Fitness;
 
-            return fitnessFunction(this, FeaturesUsed);
+            return species.SharedFitness * species.Count;
         }
 
-        public void Evaluate(List<Datum> features, Func<Entity, int, double> fitnessFunction, bool cumulative, 
+        public void Evaluate(List<Datum> features, bool cumulative, 
             Func<List<double>, List<double>, bool> successCondition)
         {
             if (cumulative)
-                Mean = Mean * FeaturesUsed;
+                Fitness = Fitness * FeaturesUsed;
             else
-                Mean = FeaturesUsed = 0;
+                Fitness = FeaturesUsed = 0;
 
             if (features?.Count > 0)
             {
@@ -76,7 +80,7 @@ namespace Core
                 cluster.GenerateFromStructure(Genes);
 
                 if (!cumulative)
-                    Positive = true;
+                    Successful = true;
 
                 for (int i = 0; i < features.Count; ++i)
                 {
@@ -90,20 +94,19 @@ namespace Core
 
                     if (steps == -1)
                     {
-                        Mean = double.PositiveInfinity;
-                        Positive = false;
-                        return;
+                        squareSum = 1;
+                        Successful = false;
                     }
                     else
                     {
                         for (int j = 0; j < expectedOutput.Count; ++j)
                             squareSum += (predictedOutput[j] - expectedOutput[j]) * (predictedOutput[j] - expectedOutput[j]);
                         
-                        Positive = Positive && successCondition(expectedOutput, predictedOutput);
+                        Successful = Successful && successCondition(expectedOutput, predictedOutput);
                         squareSum /= expectedOutput.Count;
                     }
 
-                    Mean += squareSum;
+                    Fitness += squareSum;
                 }
 
                 FeaturesUsed += features.Count;
@@ -111,36 +114,97 @@ namespace Core
 
             if (FeaturesUsed > 0)
             {
-                Mean /= FeaturesUsed;
-                Fitness = fitnessFunction(this, FeaturesUsed);
+                Fitness /= FeaturesUsed;
             }
             else
             {
-                Mean = double.PositiveInfinity;
                 Fitness = double.PositiveInfinity;
             }
         }
 
-        public void Mutate(NeuronMutationProbabilities p, double mutationRate)
+        public bool Mutate(NeuronMutationProbabilities p, double mutationRate)
         {
             var cluster = new Cluster();
             cluster.GenerateFromStructure(Genes);
-            Genes = cluster.Mutate(p, mutationRate);
+
+            Genes = cluster.Mutate(p, mutationRate, out bool hasMutated);
+
             NeuronCount = cluster.NeuronCount;
             SynapseCount = cluster.SynapseCount;
 
             // TODO: these shouldn't change ever, check if do
             InputSize = cluster.InputSize;
             OutputSize = cluster.OutputSize;
+
+            return hasMutated;
+        }
+
+        public void Speciate()
+        {
+            int smallestSpecies = int.MaxValue;
+
+            List<(Entity original, double fitness, int count)> catalog;
+
+            lock (HostCulture.SpeciesLock)
+            {
+                catalog = HostCulture.SpeciesCatalog.Values.ToList();
+            }
+
+            foreach (var species in catalog)
+            {
+                double compatibility = Compatibility(species.original);
+                int count = species.count;
+
+                if (compatibility < HostCulture.Cfg.SpeciationFactor
+                && count > 0 && count < smallestSpecies) // finds the species with the least members
+                {
+                    smallestSpecies = count;
+                    Species = species.original.Species;
+                }
+            }
+
+            if (Species == Guid.Empty)
+                Species = Guid.NewGuid();
+        }
+
+        public void Speciate(Entity mother, Entity father)
+        {
+            if (mother == null || father == null)
+            {
+                Speciate();
+                return;
+            }
+
+            if (mother.Fitness > father.Fitness)
+            {
+                var t1 = mother;
+                mother = father;
+                father = t1;
+            }
+
+            Entity original = null;
+            lock (HostCulture.SpeciesLock)
+            {
+                if (HostCulture.SpeciesCatalog.ContainsKey(mother.Species))
+                    original = HostCulture.SpeciesCatalog[mother.Species].Original;
+            }
+
+            if (Compatibility(original) < HostCulture.Cfg.SpeciationFactor)
+                Species = mother.Species;
+            else
+                Speciate();
         }
 
         // percentage of genes that are unique between the mates
-        public double Compatibility(Entity mate)
+        public double Compatibility(Entity other)
         {
-            double commonGenes = 0;
+            if (other == null)
+                return double.MaxValue;
+
+            double wDistance = 0;
 
             var motherGenes = this.Genes;
-            var fatherGenes = mate.Genes;
+            var fatherGenes = other.Genes;
 
             int m = 0, f = 0;
             while (m < motherGenes.Count && f < fatherGenes.Count)
@@ -151,30 +215,60 @@ namespace Core
                 {
                     if (X.Destination == Y.Destination)
                     {
-                        commonGenes++;
+                        wDistance += Math.Abs(X.Strength - Y.Strength);
+
                         m++;
                         f++;
                     }
                     else if (X.Destination.CompareTo(Y.Destination) < 0)
+                    {
+                        wDistance += Math.Abs(X.Strength);
                         m++;
+                    }
                     else
+                    {
+                        wDistance += Math.Abs(Y.Strength);
                         f++;
+                    }
                 }
                 else if (X.Source.CompareTo(Y.Source) < 0)
+                {
+                    wDistance += Math.Abs(X.Strength);
                     m++;
+                }
                 else
+                {
+                    wDistance += Math.Abs(Y.Strength);
                     f++;
+                }
             }
 
-            return (motherGenes.Count + fatherGenes.Count - 2 * commonGenes) / 
-                   (motherGenes.Count + fatherGenes.Count);
+            while (m < motherGenes.Count)
+            {
+                var gene = motherGenes[m++];
+                wDistance += Math.Abs(gene.Strength);
+            }
+
+            while (f < fatherGenes.Count)
+            {
+                var gene = fatherGenes[f++];
+                wDistance += Math.Abs(gene.Strength);
+            }
+
+            return wDistance;
         }
 
         public Entity Copulate(Entity father, CultureConfiguration fatherCfg)
         {
             Entity mother = this;
 
-            if (mother.ComputeFitness(fatherCfg.FitnessFunction) > father.Fitness)
+            if (mother.Equals(father))
+            {
+                mother.ChildCount++;
+                return new Entity(Genes);
+            }
+
+            if (mother.Fitness > father.Fitness)
             {
                 var t1 = mother;
                 mother = father;

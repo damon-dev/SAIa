@@ -25,7 +25,7 @@ namespace CLI.MNIST
         {
             base.Display(champion, cfg);
 
-            if (champion == null || champion.Mean == double.PositiveInfinity) return;
+            if (champion == null || champion.Fitness == double.PositiveInfinity) return;
 
             var cluster = new Cluster();
             cluster.GenerateFromStructure(champion.Genes);
@@ -73,7 +73,7 @@ namespace CLI.MNIST
                 Console.WriteLine($"{i} : {errorRate[i]} / {totalElements[i]}    ");
             }
 
-            Console.WriteLine($"Mean error: {champion.Mean:0.00000}    ");
+            Console.WriteLine($"Mean error: {champion.Fitness:0.00000}    ");
             Console.WriteLine($"Features used: {champion.FeaturesUsed}    ");
             Console.WriteLine($"Average steps: {totalSteps:0.00}    ");
             Console.SetCursorPosition(0, Console.CursorTop - 15);

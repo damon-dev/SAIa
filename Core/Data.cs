@@ -34,6 +34,8 @@ namespace Core
         public int InputFeatureCount { get; set; }
         public int OutputFeatureCount { get; set; }
 
+        public Func<List<double>, List<double>, bool> SuccessCondition { get; set; }
+
         public Data()
         {
             Training = new List<Datum>();

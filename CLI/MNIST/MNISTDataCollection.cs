@@ -27,6 +27,16 @@ namespace CLI.MNIST
 
             InputFeatureCount = Training[0].Input.Count;
             OutputFeatureCount = Training[0].Output.Count;
+
+            SuccessCondition = (expected, predicted) =>
+            {
+                int label = expected.IndexOf(1);
+                for (int i = 0; i < predicted.Count; ++i)
+                    if (predicted[i] >= predicted[label] && i != label)
+                        return false;
+
+                return true;
+            };
         }
 
         public override void FetchTrainingData(out List<Datum> data, int count, bool random)
