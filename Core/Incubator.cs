@@ -65,6 +65,18 @@ namespace Core
             cfg.SuccessFunction = dataCollection.SuccessCondition;
             cultures.Add(new Culture(this, cfg));
 
+            cfg = new CultureConfiguration(CultureConfiguration.Balance);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
+            cultures.Add(new Culture(this, cfg));
+
+            cfg = new CultureConfiguration(CultureConfiguration.Balance);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
+            cultures.Add(new Culture(this, cfg));
+
+            cfg = new CultureConfiguration(CultureConfiguration.Balance);
+            cfg.SuccessFunction = dataCollection.SuccessCondition;
+            cultures.Add(new Culture(this, cfg));
+
             cfg = new CultureConfiguration(CultureConfiguration.Grow);
             cfg.SuccessFunction = dataCollection.SuccessCondition;
             cultures.Add(new Culture(this, cfg));
@@ -92,7 +104,7 @@ namespace Core
             if (isRunning) return;
 
             isRunning = true;
-            int startingFeatures = 10;
+            int startingFeatures = 100;
 
             overlords = new Dictionary<Task<Entity>, Culture>();
             dataCollection.FetchTrainingData(out List<Datum> features, startingFeatures, false);

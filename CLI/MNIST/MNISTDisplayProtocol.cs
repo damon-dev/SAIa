@@ -73,10 +73,9 @@ namespace CLI.MNIST
                 Console.WriteLine($"{i} : {errorRate[i]} / {totalElements[i]}    ");
             }
 
-            Console.WriteLine($"Mean error: {champion.Fitness:0.00000}    ");
             Console.WriteLine($"Features used: {champion.FeaturesUsed}    ");
             Console.WriteLine($"Average steps: {totalSteps:0.00}    ");
-            Console.SetCursorPosition(0, Console.CursorTop - 15);
+            Console.SetCursorPosition(0, Console.CursorTop - 14);
         }
     }
 }

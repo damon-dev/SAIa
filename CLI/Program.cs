@@ -7,17 +7,17 @@ namespace CLI
 {
     class Program : IObserver<Entity>
     {
-        private const int threadCount = 5;
-        private const int size = 100;
+        private const int threadCount = 8;
+        private const int size = 50;
         private IDisposable stopper;
         private Entity currentChampion;
-        private MNISTDisplayProtocol displayProtocol;
+        private XORDisplayProtocol displayProtocol;
 
         static void Main(string[] args)
         {
             var program = new Program();
-            var data = new MNISTDataCollection();
-            program.displayProtocol = new MNISTDisplayProtocol(data);
+            var data = new XORDataCollection();
+            program.displayProtocol = new XORDisplayProtocol(data);
             Incubator incubator;
 
             program.displayProtocol.Display(null, null);
@@ -76,7 +76,7 @@ namespace CLI
             var cfg = CultureConfiguration.Shrink;
 
             if (currentChampion == null ||
-                entity.Fitness < currentChampion.Fitness ||
+                entity.Fitness > currentChampion.Fitness ||
                 entity.FeaturesUsed > currentChampion.FeaturesUsed)
             {
                 currentChampion = entity;

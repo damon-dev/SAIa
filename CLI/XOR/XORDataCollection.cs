@@ -21,7 +21,7 @@ namespace CLI.XOR
 
             SuccessCondition = (expected, predicted) =>
             {
-                if (Math.Abs(predicted[0] - expected[0]) < .0001)
+                if (Math.Abs(predicted[0] - expected[0]) < .001)
                     return true;
 
                 return false;

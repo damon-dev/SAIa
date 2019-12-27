@@ -55,71 +55,68 @@ namespace Core
             InputSize = cluster.InputSize;
             OutputSize = cluster.OutputSize;
 
-            Fitness = double.PositiveInfinity;
+            Fitness = 0;
         }
 
         public double SharedFitness()
         {
-            if (!HostCulture.SpeciesCatalog.TryGetValue(Species, out var species))
+            if (!HostCulture.SpeciesCatalog.TryGetValue(Species, out var species) 
+            || species.Count <= 0)
                 return Fitness;
 
-            return species.SharedFitness * species.Count;
+            return species.SharedFitness / species.Count;
         }
 
-        public void Evaluate(List<Datum> features, bool cumulative, 
+        public void Evaluate(List<Datum> features, bool cumulative,
             Func<List<double>, List<double>, bool> successCondition)
         {
+            if (features == null || features.Count == 0) return;
+
+            var cluster = new Cluster();
+            cluster.GenerateFromStructure(Genes);
+
+            double meanSquareSum;
+
             if (cumulative)
-                Fitness = Fitness * FeaturesUsed;
-            else
-                Fitness = FeaturesUsed = 0;
-
-            if (features?.Count > 0)
             {
-                var cluster = new Cluster();
-                cluster.GenerateFromStructure(Genes);
+                meanSquareSum = Fitness == 0 ? double.PositiveInfinity : FeaturesUsed / Fitness;
+            }
+            else
+            {
+                meanSquareSum = FeaturesUsed = 0;
+                Successful = true;
+            }
 
-                if (!cumulative)
-                    Successful = true;
+            for (int i = 0; i < features.Count; ++i)
+            {
+                var input = features[i].Input;
+                var expectedOutput = features[i].Output;
 
-                for (int i = 0; i < features.Count; ++i)
+                double squareSum = 0;
+
+                var predictedOutput = cluster.Querry(input, out long steps);
+                cluster.Nap();
+
+                if (steps == -1)
                 {
-                    var input = features[i].Input;
-                    var expectedOutput = features[i].Output;
+                    squareSum = 1;
+                    Successful = false;
+                }
+                else
+                {
+                    for (int j = 0; j < expectedOutput.Count; ++j)
+                        squareSum += (predictedOutput[j] - expectedOutput[j]) * (predictedOutput[j] - expectedOutput[j]);
 
-                    double squareSum = 0;
-
-                    var predictedOutput = cluster.Querry(input, out long steps);
-                    cluster.Nap();
-
-                    if (steps == -1)
-                    {
-                        squareSum = 1;
-                        Successful = false;
-                    }
-                    else
-                    {
-                        for (int j = 0; j < expectedOutput.Count; ++j)
-                            squareSum += (predictedOutput[j] - expectedOutput[j]) * (predictedOutput[j] - expectedOutput[j]);
-                        
-                        Successful = Successful && successCondition(expectedOutput, predictedOutput);
-                        squareSum /= expectedOutput.Count;
-                    }
-
-                    Fitness += squareSum;
+                    Successful = Successful && successCondition(expectedOutput, predictedOutput);
+                    squareSum /= expectedOutput.Count;
                 }
 
-                FeaturesUsed += features.Count;
+                meanSquareSum += squareSum;
             }
 
-            if (FeaturesUsed > 0)
-            {
-                Fitness /= FeaturesUsed;
-            }
-            else
-            {
-                Fitness = double.PositiveInfinity;
-            }
+            FeaturesUsed += features.Count;
+
+            Fitness = meanSquareSum > 0 ? FeaturesUsed / meanSquareSum : double.PositiveInfinity;
         }
 
         public bool Mutate(NeuronMutationProbabilities p, double mutationRate)
@@ -141,25 +138,25 @@ namespace Core
 
         public void Speciate()
         {
-            int smallestSpecies = int.MaxValue;
-
-            List<(Entity original, double fitness, int count)> catalog;
+            int lowestCount = int.MaxValue;
+            double factor;
+            List<(Entity original, double sharedFitness, int count)> catalog;
 
             lock (HostCulture.SpeciesLock)
             {
-                catalog = HostCulture.SpeciesCatalog.Values.ToList();
+                catalog = new List<(Entity, double, int)>(HostCulture.SpeciesCatalog.Values);
+                factor = HostCulture.Cfg.SpeciationFactor;
             }
 
-            foreach (var species in catalog)
+            foreach (var (original, sharedFitness, count) in catalog)
             {
-                double compatibility = Compatibility(species.original);
-                int count = species.count;
+                double compatibility = Compatibility(original);
 
-                if (compatibility < HostCulture.Cfg.SpeciationFactor
-                && count > 0 && count < smallestSpecies) // finds the species with the least members
+                if (compatibility < factor
+                && count < lowestCount)
                 {
-                    smallestSpecies = count;
-                    Species = species.original.Species;
+                    lowestCount = count;
+                    Species = original.Species;
                 }
             }
 
@@ -167,31 +164,24 @@ namespace Core
                 Species = Guid.NewGuid();
         }
 
-        public void Speciate(Entity mother, Entity father)
+        public void Speciate(Entity strongMate)
         {
-            if (mother == null || father == null)
-            {
-                Speciate();
-                return;
-            }
-
-            if (mother.Fitness > father.Fitness)
-            {
-                var t1 = mother;
-                mother = father;
-                father = t1;
-            }
-
             Entity original = null;
-            lock (HostCulture.SpeciesLock)
+            if (HostCulture.SpeciesCatalog.TryGetValue(strongMate.Species, out (Entity, double, int) species))
+                original = species.Item1;
+
+            if (original == null)
             {
-                if (HostCulture.SpeciesCatalog.ContainsKey(mother.Species))
-                    original = HostCulture.SpeciesCatalog[mother.Species].Original;
+                if (Compatibility(strongMate) < HostCulture.Cfg.SpeciationFactor)
+                    Species = strongMate.Species;
+            }
+            else
+            {
+                if (Compatibility(original) < HostCulture.Cfg.SpeciationFactor)
+                    Species = strongMate.Species;
             }
 
-            if (Compatibility(original) < HostCulture.Cfg.SpeciationFactor)
-                Species = mother.Species;
-            else
+            if (Species == Guid.Empty)
                 Speciate();
         }
 
@@ -203,14 +193,14 @@ namespace Core
 
             double wDistance = 0;
 
-            var motherGenes = this.Genes;
-            var fatherGenes = other.Genes;
+            var thisGenes = this.Genes;
+            var otherGenes = other.Genes;
 
             int m = 0, f = 0;
-            while (m < motherGenes.Count && f < fatherGenes.Count)
+            while (m < thisGenes.Count && f < otherGenes.Count)
             {
-                var X = motherGenes[m];
-                var Y = fatherGenes[f];
+                var X = thisGenes[m];
+                var Y = otherGenes[f];
                 if (X.Source == Y.Source)
                 {
                     if (X.Destination == Y.Destination)
@@ -222,79 +212,72 @@ namespace Core
                     }
                     else if (X.Destination.CompareTo(Y.Destination) < 0)
                     {
-                        wDistance += Math.Abs(X.Strength);
+                        wDistance += Math.Abs(X.Strength) + 1;
                         m++;
                     }
                     else
                     {
-                        wDistance += Math.Abs(Y.Strength);
+                        wDistance += Math.Abs(Y.Strength) + 1;
                         f++;
                     }
                 }
                 else if (X.Source.CompareTo(Y.Source) < 0)
                 {
-                    wDistance += Math.Abs(X.Strength);
+                    wDistance += Math.Abs(X.Strength) + 1;
                     m++;
                 }
                 else
                 {
-                    wDistance += Math.Abs(Y.Strength);
+                    wDistance += Math.Abs(Y.Strength) + 1;
                     f++;
                 }
             }
 
-            while (m < motherGenes.Count)
+            while (m < thisGenes.Count)
             {
-                var gene = motherGenes[m++];
-                wDistance += Math.Abs(gene.Strength);
+                var gene = thisGenes[m++];
+                wDistance += Math.Abs(gene.Strength) + 1;
             }
 
-            while (f < fatherGenes.Count)
+            while (f < otherGenes.Count)
             {
-                var gene = fatherGenes[f++];
-                wDistance += Math.Abs(gene.Strength);
+                var gene = otherGenes[f++];
+                wDistance += Math.Abs(gene.Strength) + 1;
             }
 
             return wDistance;
         }
 
-        public Entity Copulate(Entity father, CultureConfiguration fatherCfg)
+        public Entity Copulate(Entity weak, CultureConfiguration cfg)
         {
-            Entity mother = this;
+            Entity strong = this;
 
-            if (mother.Equals(father))
+            if (strong.Equals(weak))
             {
-                mother.ChildCount++;
+                strong.ChildCount++;
                 return new Entity(Genes);
             }
 
-            if (mother.Fitness > father.Fitness)
-            {
-                var t1 = mother;
-                mother = father;
-                father = t1;
-            }
+            strong.ChildCount++;
+            weak.ChildCount++;
 
-            mother.ChildCount++;
-            father.ChildCount++;
+            var strongGenes = new List<Gene>(strong.Genes);
+            var weakGenes = new List<Gene>(weak.Genes);
 
-            var motherGenes = new List<Gene>(mother.Genes);
-            var fatherGenes = new List<Gene>(father.Genes);
-
-            var commonStructure = new List<Gene>();
-            var motherUniqueStructure = new List<Gene>();
-            var fatherUniqueStructure = new List<Gene>();
+            var commonGenes = new List<Gene>();
+            var strongUniqueGenes = new List<Gene>();
+            var weakUniqueGenes = new List<Gene>();
 
             int m = 0, f = 0;
-            while (m < motherGenes.Count && f < fatherGenes.Count)
+            while (m < strongGenes.Count && f < weakGenes.Count)
             {
-                var X = motherGenes[m];
-                var Y = fatherGenes[f];
+                var X = strongGenes[m];
+                var Y = weakGenes[f];
                 if (X.Source == Y.Source)
                 {
                     if (X.Destination == Y.Destination)
                     {
-                        commonStructure.Add((X.Source, Y.Destination,
+                        commonGenes.Add((X.Source, Y.Destination,
                             (X.Strength + Y.Strength) / 2));
 
                         m++;
@@ -302,54 +285,50 @@ namespace Core
                     }
                     else if (X.Destination.CompareTo(Y.Destination) < 0)
                     {
-                        motherUniqueStructure.Add(X);
+                        strongUniqueGenes.Add(X);
                         m++;
                     }
                     else
                     {
-                        fatherUniqueStructure.Add(Y);
+                        weakUniqueGenes.Add(Y);
                         f++;
                     }
                 }
                 else if (X.Source.CompareTo(Y.Source) < 0)
                 {
 
-                    motherUniqueStructure.Add(X);
+                    strongUniqueGenes.Add(X);
                     m++;
                 }
                 else
                 {
-                    fatherUniqueStructure.Add(Y);
+                    weakUniqueGenes.Add(Y);
                     f++;
                 }
             }
 
-            while (m < motherGenes.Count)
+            while (m < strongGenes.Count)
             {
-                var gene = motherGenes[m++];
-                motherUniqueStructure.Add(gene);
+                var gene = strongGenes[m++];
+                strongUniqueGenes.Add(gene);
             }
 
-            while (f < fatherGenes.Count)
+            while (f < weakGenes.Count)
             {
-                var gene = fatherGenes[f++];
-                fatherUniqueStructure.Add(gene);
+                var gene = weakGenes[f++];
+                weakUniqueGenes.Add(gene);
             }
 
-            // father is the weaker one
-            switch (fatherCfg.Mode)
+            switch (cfg.Mode)
             {
                 case Modes.Grow:
-                    // more like mother
-                    return MoreLike(motherGenes, motherUniqueStructure, fatherUniqueStructure, commonStructure);
+                    return MoreLike(strongGenes, strongUniqueGenes, weakUniqueGenes, commonGenes);
 
                 case Modes.Balance:
-                    // exclusive more like mother
-                    return ExclusiveMoreLike(motherGenes, motherUniqueStructure, commonStructure);
+                    return ExclusiveMoreLike(strongGenes, strongUniqueGenes, commonGenes);
 
                 case Modes.Shrink:
-                    // absolute more like mother
-                    return AbsoluteMoreLike(motherGenes, motherUniqueStructure, commonStructure);
+                    return AbsoluteMoreLike(strongGenes, strongUniqueGenes, commonGenes);
 
                 default: return null;
             }

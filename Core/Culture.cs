@@ -14,11 +14,11 @@ namespace Core
             GlobalMutationRate = .03,
             InternalMutationRates = new NeuronMutationProbabilities
             {
-                MutationRate = .005,
-                NeuronCreation = .02,
-                NeuronDeletion = .01,
-                SynapseCreation = .3,
-                SynapseDeletion = .2,
+                MutationRate = .01,
+                NeuronCreation = .015,
+                NeuronDeletion = .015,
+                SynapseCreation = .25,
+                SynapseDeletion = .25,
                 SynapseAlteration = .6
             }
         };
@@ -26,10 +26,10 @@ namespace Core
         public static readonly CultureConfiguration Shrink = new CultureConfiguration
         {
             Mode = Modes.Shrink,
-            GlobalMutationRate = .05,
+            GlobalMutationRate = .3,
             InternalMutationRates = new NeuronMutationProbabilities
             {
-                MutationRate = .01,
+                MutationRate = .1,
                 NeuronCreation = .01,
                 NeuronDeletion = .03,
                 SynapseCreation = .1,
@@ -41,10 +41,10 @@ namespace Core
         public static readonly CultureConfiguration Grow = new CultureConfiguration
         {
             Mode = Modes.Grow,
-            GlobalMutationRate = .01,
+            GlobalMutationRate = .1,
             InternalMutationRates = new NeuronMutationProbabilities
             {
-                MutationRate = .001,
+                MutationRate = .05,
                 NeuronCreation = .03,
                 NeuronDeletion = .01,
                 SynapseCreation = .4,
@@ -57,9 +57,8 @@ namespace Core
         public double GlobalMutationRate { get; set; }
         public NeuronMutationProbabilities InternalMutationRates { get; set; }
         public Func<List<double>, List<double>, bool> SuccessFunction { get; set; }
-        public int TournamentSize { get; set; } = 10;
-        public int MaxChildren { get; set; } = 20;
-        public double SpeciationFactor = 10;
+        public int TournamentSize { get; set; } = 5;
+        public double SpeciationFactor = 2; // TODO: needs to be saved 
 
         public CultureConfiguration() { }
 
@@ -71,7 +70,6 @@ namespace Core
             TournamentSize = cfg.TournamentSize;
             SuccessFunction = cfg.SuccessFunction;
             SpeciationFactor = cfg.SpeciationFactor;
-            MaxChildren = cfg.MaxChildren;
         }
     }
 
@@ -96,18 +94,17 @@ namespace Core
 
         private int Tournament()
         {
-            // best fit
             int bestPosition = -1;
-            double bestFitnes = double.PositiveInfinity;
+            double bestFitnes = double.NegativeInfinity;
 
             for (int i = 0; i < Cfg.TournamentSize; ++i)
             {
                 int index = R.NG.Next(Entities.Count);
                 double sharedFitness = Entities[index].SharedFitness();
 
-                if (Entities[index].ChildCount < Cfg.MaxChildren
-                && (sharedFitness < bestFitnes
-                || (bestPosition > -1 && Math.Abs(sharedFitness - bestFitnes) < 0.00001 && Entities[bestPosition].Fitness > Entities[index].Fitness)))
+                if (sharedFitness > bestFitnes
+                || (bestPosition > -1 && Math.Abs(sharedFitness - bestFitnes) < 0.00001 
+                && Entities[bestPosition].Fitness < Entities[index].Fitness))
                 {
                     bestFitnes = sharedFitness;
                     bestPosition = index;
@@ -119,12 +116,11 @@ namespace Core
 
         private Entity Tournament(Entity mate, int mateIndex)
         {
-            // best fit
             int position = -1;
-            double bestFitnes = double.PositiveInfinity;
+            double bestFitnes = double.NegativeInfinity;
 
             int alrightPosition = -1;
-            double alrightFitness = double.PositiveInfinity;
+            double alrightFitness = double.NegativeInfinity;
 
             for (int i = 0; i < Cfg.TournamentSize; ++i)
             {
@@ -132,17 +128,15 @@ namespace Core
                 while(index == mateIndex)
                     index = R.NG.Next(Entities.Count);
 
-                if (Entities[index].ChildCount < Cfg.MaxChildren
-                && Entities[index].Fitness < bestFitnes 
-                && Entities[index].Species == mate.Species)
+                if (Entities[index].Fitness > bestFitnes
+                && mate.Species == Entities[index].Species)
                 {
                     bestFitnes = Entities[index].Fitness;
                     position = index;
                 }
 
                 if (position == -1
-                && Entities[index].ChildCount < Cfg.MaxChildren
-                && Entities[index].Fitness < alrightFitness
+                && Entities[index].Fitness > alrightFitness
                 && mate.Compatibility(Entities[index]) < Cfg.SpeciationFactor)
                 {
                     alrightFitness = Entities[index].Fitness;
@@ -154,12 +148,12 @@ namespace Core
             {
                 var targetCulture = HostIncubator.RandomCulture(this);
                 position = R.NG.Next(targetCulture.Entities.Count);
-                var entity = targetCulture.Entities[position];
+                var foreignEntity = targetCulture.Entities[position];
 
                 if (alrightPosition != -1)
                     return Entities[alrightPosition];
-                else if (mate.Compatibility(entity) < Cfg.SpeciationFactor)
-                    return entity;
+                if (mate.Compatibility(foreignEntity) < Cfg.SpeciationFactor)
+                    return foreignEntity;
                 else
                     return mate; // if no mate has been found mutate the mate
             }
@@ -172,10 +166,11 @@ namespace Core
             if (hunter == null)
                 return -1;
 
-            if (hunter.Fitness < Entities[0].Fitness) // dethrones the current culture champion
+            if (hunter.Fitness > Entities[0].Fitness) // dethrones the current culture champion
                 return 0;
 
-            if (Entities[parentIndex].ChildCount > 2 && parentIndex != 0) // parent is old and can be replaced
+            if (Entities[parentIndex].ChildCount > 2 
+            && parentIndex != 0) // parent is old and can be replaced
                 return parentIndex;
 
             int worstPosition = -1;
@@ -191,9 +186,9 @@ namespace Core
                 var newPrey = Entities[index];
                 double preySharedFitness = newPrey.SharedFitness();
 
-                if (preySharedFitness > worstFitness // found weaker species
-                || (worstPosition > -1 && Math.Abs(preySharedFitness - worstFitness) < 0.00001 && newPrey.Fitness > Entities[worstPosition].Fitness) // found weaker individual of already found weaker species
-                || (hunter.Species == newPrey.Species && hunter.Fitness < newPrey.Fitness && preySharedFitness >= worstFitness)) // found weaker individual in same species as hunter
+                if (preySharedFitness < worstFitness // found weaker species
+                || (worstPosition > -1 && Math.Abs(preySharedFitness - worstFitness) < 0.00001 && newPrey.Fitness < Entities[worstPosition].Fitness) // found weaker individual of already found weaker species
+                || (hunter.Species == newPrey.Species && hunter.Fitness > newPrey.Fitness && preySharedFitness <= worstFitness)) // found weaker individual in same species as hunter
                 {
                     worstFitness = preySharedFitness;
                     worstPosition = index;
@@ -202,7 +197,7 @@ namespace Core
 
             if (worstPosition == -1)
             {
-                if (hunter.Fitness < Entities[parentIndex].Fitness) // parental sacrifice
+                if (hunter.Fitness > Entities[parentIndex].Fitness) // parental sacrifice
                     worstPosition = parentIndex;
                 else
                 {
@@ -212,6 +207,27 @@ namespace Core
             }
 
             return worstPosition;
+        }
+
+        private void AttemptInvasion(Entity hunter)
+        {
+            hunter.HostCulture = this;
+            hunter.Speciate();
+
+            lock (SpeciesLock)
+            {
+                if (Entities[0].Fitness < hunter.Fitness)
+                {
+                    ReplaceEntity(hunter, 0);
+                }
+                else
+                {
+                    int index = R.NG.Next(Entities.Count);
+
+                    if (Entities[index].SharedFitness() < hunter.SharedFitness())
+                        ReplaceEntity(hunter, index);
+                }
+            }
         }
 
         private void ReplaceEntity(Entity replacement, int position)
@@ -231,32 +247,10 @@ namespace Core
                 {
                     (original, fitness, count) = SpeciesCatalog[replacement.Species];
                     fitness = (fitness * count + replacement.Fitness) / (count + 1);
-                    //fitness = Math.Min(fitness, replacement.Fitness);
                     SpeciesCatalog[replacement.Species] = (original, fitness, count + 1);
                 }
                 else
                     SpeciesCatalog.Add(replacement.Species, (replacement, replacement.Fitness, 1));
-            }
-        }
-
-        private void AttemptInvasion(Entity hunter)
-        {
-            hunter.HostCulture = this;
-            hunter.Speciate();
-
-            lock (SpeciesLock)
-            {
-                if (Entities[0].Fitness > hunter.Fitness)
-                {
-                    ReplaceEntity(hunter, 0);
-                }
-                else
-                {
-                    int index = R.NG.Next(Entities.Count);
-
-                    if (Entities[index].SharedFitness() > hunter.SharedFitness())
-                        ReplaceEntity(hunter, index);
-                }
             }
         }
 
@@ -273,8 +267,7 @@ namespace Core
                     if (Entities[j].Compatibility(Entities[i]) < Cfg.SpeciationFactor)
                     {
                         var (original, fitness, count) = SpeciesCatalog[Entities[j].Species];
-                        fitness = (fitness * count + Entities[i].Fitness) / (count + 1); // average
-                        //fitness = Math.Min(fitness, Entities[i].Fitness); // best fitness
+                        fitness = (fitness * count + Entities[i].Fitness) / (count + 1);
                         SpeciesCatalog[Entities[j].Species] = (original, fitness, count + 1);
                         Entities[i].Species = Entities[j].Species;
                         break;
@@ -300,7 +293,7 @@ namespace Core
                 {
                     Entities[i].Evaluate(features, cumulative, Cfg.SuccessFunction);
 
-                    if (Entities[i].Fitness < Entities[0].Fitness)
+                    if (Entities[i].Fitness > Entities[0].Fitness)
                     {
                         var t = Entities[0];
                         Entities[0] = Entities[i];
@@ -334,8 +327,14 @@ namespace Core
                     mateIndex = Tournament();
 
                 father = Entities[mateIndex];
-
                 mother = Tournament(father, mateIndex);
+
+                if (mother.Fitness < father.Fitness)
+                {
+                    var t1 = mother;
+                    mother = father;
+                    father = t1;
+                }
 
                 var child = mother.Copulate(father, Cfg);
                 child.HostCulture = this;
@@ -353,14 +352,14 @@ namespace Core
 
                 child.Evaluate(features, false, Cfg.SuccessFunction);
 
-                child.Speciate(mother, father);
+                child.Speciate(mother);
 
                 if (!hasMutated && mother.Species == father.Species)
                 {
                     while (child.Species != mother.Species)
                     {
                         Cfg.SpeciationFactor += 0.3;
-                        child.Speciate(mother, father);
+                        child.Speciate(mother);
                     }
                 }
 

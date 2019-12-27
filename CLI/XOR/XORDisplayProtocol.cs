@@ -36,9 +36,8 @@ namespace CLI.XOR
 
             totalSteps /= features.Count;
 
-            Console.WriteLine($"Mean error: {champion.Fitness:0.00000}    ");
             Console.WriteLine($"Steps: {totalSteps:0.00}      ");
-            Console.SetCursorPosition(0, Console.CursorTop - features.Count - 4);
+            Console.SetCursorPosition(0, Console.CursorTop - features.Count - 3);
         }
     }
 }
