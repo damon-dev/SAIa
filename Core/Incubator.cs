@@ -11,22 +11,20 @@ namespace Core
         public static ConcurrentDictionary<(Guid, Guid), Guid> MutationCatalog;
 
         private bool isRunning;
-        private Data dataCollection;
+        private Storage storage;
         private List<IObserver<Entity>> observers;
         private Dictionary<Task<Entity>, Culture> overlords;
         private List<Culture> cultures;
 
-        public Incubator(Data _data, bool fromSaved, int cultureCount, int cultureSize)
+        public Incubator()
         {
             observers = new List<IObserver<Entity>>();
 
             if (MutationCatalog == null)
                 MutationCatalog = new ConcurrentDictionary<(Guid, Guid), Guid>();
 
-            dataCollection = _data;
+            storage = new Storage();
             isRunning = false;
-
-            Populate(fromSaved, cultureCount, cultureSize);
         }
 
         public IDisposable Subscribe(IObserver<Entity> observer)
@@ -38,49 +36,34 @@ namespace Core
             return new Unsubscriber<Entity>(observers, observer);
         }
 
-        public void Populate(bool fromSaved, int cultureCount, int cultureSize)
+        public void Populate(bool fromSaved, int cultureSize, List<Agent> cultureSeeds)
         {
             List<Entity> entities;
+            if (cultureSeeds?.Count < 1)
+                throw new ArgumentException(nameof(cultureSeeds));
+
+            int cultureCount = cultureSeeds.Count;
+
+            //await world.RequestIOSizes(out int inputSize, out int outputSize);
+            int inputSize = 4; int outputSize = 1; // TODO: temporary
 
             if (fromSaved)
-                dataCollection.LoadEntities(out entities);
+                storage.LoadEntities(out entities);
             else
-                entities = GenerateEntities(cultureSize * cultureCount, dataCollection.InputFeatureCount, dataCollection.OutputFeatureCount);
+                entities = GenerateEntities(cultureSize * cultureCount, inputSize, outputSize);
 
-            // TODO: ******** TEMPORARY ********
             cultures = new List<Culture>();
             var cfg = new CultureConfiguration(CultureConfiguration.Shrink);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
+            //cultures.Add(new Culture(this, cultureSeeds[0], cfg));
 
-            cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
+            for (int i = 0; i < cultureCount; ++i)
+            {
+                cfg = new CultureConfiguration(CultureConfiguration.Balance);
+                cultures.Add(new Culture(this, cultureSeeds[i], cfg));
+            }
 
-            cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
-
-            cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
-
-            cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
-
-            cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
-
-            cfg = new CultureConfiguration(CultureConfiguration.Balance);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
-
-            cfg = new CultureConfiguration(CultureConfiguration.Grow);
-            cfg.SuccessFunction = dataCollection.SuccessCondition;
-            cultures.Add(new Culture(this, cfg));
-            // *********************************
+            //cfg = new CultureConfiguration(CultureConfiguration.Grow);
+            //cultures.Add(new Culture(this, cultureSeeds[cultureSeeds.Count - 1], cfg));
 
             for (int i = 0; i < cultureCount; ++i)
             {
@@ -104,44 +87,31 @@ namespace Core
             if (isRunning) return;
 
             isRunning = true;
-            int startingFeatures = 100;
 
             overlords = new Dictionary<Task<Entity>, Culture>();
-            dataCollection.FetchTrainingData(out List<Datum> features, startingFeatures, false);
 
+            // let all of them play a game each
             foreach (var culture in cultures)
-                overlords.Add(culture.EvaluateAll(features, false), culture);
+                overlords.Add(culture.EvaluateAll(), culture);
 
-            for (int i = startingFeatures; i < 100; ++i)
-            {
-                await Run(features);
-
-                if (isRunning)
-                {
-                    dataCollection.FetchTrainingData(out features, i + 1, false);
-                    foreach (var culture in cultures)
-                        overlords.Add(culture.EvaluateAll(new List<Datum> { features[i] }, true), culture);
-                }
-            }
-
-            await Run(features);
+            await Run();
         }
 
-        private async Task Run(List<Datum> features)
+        private async Task Run()
         {
             while (isRunning && overlords.Count > 0)
             {
-                var completed = await Task.WhenAny(overlords.Keys);
-                var result = completed.GetAwaiter().GetResult();
+                var completedRun = await Task.WhenAny(overlords.Keys);
+                var bestEntity = await completedRun;
 
                 foreach (var observer in observers)
-                    observer.OnNext(result);
+                    observer.OnNext(bestEntity);
 
-                var culture = overlords[completed];
-                overlords.Remove(completed);
+                var culture = overlords[completedRun];
+                overlords.Remove(completedRun);
 
-                if (!result.Successful)
-                    overlords.Add(culture.Develop(features), culture);
+                if (bestEntity.Fitness < 200)
+                    overlords.Add(culture.Develop(), culture);
                 else
                 {
                     await Task.WhenAll(overlords.Keys);
@@ -160,7 +130,7 @@ namespace Core
                 for (int i = 0; i < cultures.Count; ++i)
                     entities.AddRange(cultures[i].Entities);
 
-                dataCollection.SaveEntities(entities);
+                storage.SaveEntities(entities);
             }
 
             for (int i = observers.Count - 1; i >= 0; --i)
@@ -195,25 +165,27 @@ namespace Core
             // Linking input neurons to the reference node and the seed node
             foreach (var iGuid in inputGuids)
             {
-                initialStructure.Add((Cluster.BiasMark, iGuid, 0));
-                initialStructure.Add((Cluster.InputGuid, iGuid, 0));
+                //initialStructure.Add((Brain.BiasMark, iGuid, 0));
+                initialStructure.Add((Brain.InputGuid, iGuid, 0));
             }
 
             // Linking output neurons to the reference node and the seed node
             foreach (var oGuid in outputGuids)
             {
-                initialStructure.Add((Cluster.BiasMark, oGuid, 0));
-                initialStructure.Add((oGuid, Cluster.OutputGuid, 0));
+                //initialStructure.Add((Brain.BiasMark, oGuid, 0));
+                initialStructure.Add((oGuid, Brain.OutputGuid, 0));
             }
 
             for (int i = 0; i < entityCount; ++i)
             {
-                var randInput = inputGuids[R.NG.Next(inputGuids.Count)];
-                var randOutput = outputGuids[R.NG.Next(outputGuids.Count)];
-                var genes = new List<Gene>(initialStructure)
-                {
-                    (randInput, randOutput, Neuron.RandomSynapseStrength())
-                };
+                var genes = new List<Gene>(initialStructure);
+                for (int k = 0; k < inputGuids.Count; ++k)
+                    for (int p = 0; p < outputGuids.Count; p++)
+                    {
+                        var randInput = inputGuids[k];
+                        var randOutput = outputGuids[p];
+                        genes.Add((randInput, randOutput, Neuron.RandomSynapseStrength()));
+                    }
 
                 entities.Add(new Entity(genes));
             }

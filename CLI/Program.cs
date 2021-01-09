@@ -1,65 +1,39 @@
-﻿using CLI.MNIST;
-using CLI.XOR;
-using Core;
+﻿using Core;
+using OpenAI.SDK;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace CLI
 {
     class Program : IObserver<Entity>
     {
-        private const int threadCount = 8;
-        private const int size = 50;
+        private const int threadCount = 3;
+        private const int size = 100;
         private IDisposable stopper;
         private Entity currentChampion;
-        private XORDisplayProtocol displayProtocol;
+        private Display display;
 
         static void Main(string[] args)
         {
             var program = new Program();
-            var data = new XORDataCollection();
-            program.displayProtocol = new XORDisplayProtocol(data);
+            program.display = new Display();
             Incubator incubator;
 
-            program.displayProtocol.Display(null, null);
+            Console.WriteLine("Starting training.");
+            //var service = new ApiService();
+            var agents = new List<Agent>();
 
-            switch(program.displayProtocol.ReadResponse())
-            {
-                case Response.Load:
-                    incubator = new Incubator(data, true, threadCount, size);
-                    program.stopper = incubator.Subscribe(program);
-                    incubator.Start();
-                    break;
+            for (int i = 0; i < threadCount; ++i)
+                agents.Add(new CartpoleAgent());
 
-                case Response.Train:
-                    incubator = new Incubator(data, false, threadCount, size);
-                    program.stopper = incubator.Subscribe(program);
-                    incubator.Start();
-                    break;
+            incubator = new Incubator();
+            program.stopper = incubator.Subscribe(program);
+            incubator.Populate(false, size, agents);
+            var d = program.display.Animate();
+            incubator.Start().GetAwaiter().GetResult();
 
-                default:
-                    return;
-            }
-
-            Response response;
-            while((response = program.displayProtocol.ReadResponse()) != Response.Quit)
-            {
-                switch (response)
-                {
-                    case Response.Train:
-                        program.stopper = incubator.Subscribe(program);
-                        incubator.Start();
-                        break;
-
-                    case Response.Stop:
-                        incubator.Stop(true);
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-
-            incubator.Stop(false);
+            Console.ReadLine();
         }
 
         public void OnCompleted()
@@ -73,14 +47,11 @@ namespace CLI
 
         public void OnNext(Entity entity)
         {
-            var cfg = CultureConfiguration.Shrink;
-
             if (currentChampion == null ||
-                entity.Fitness > currentChampion.Fitness ||
-                entity.FeaturesUsed > currentChampion.FeaturesUsed)
+                entity.Fitness > currentChampion.Fitness)
             {
                 currentChampion = entity;
-                displayProtocol.Display(entity, cfg);
+                display.Champion = entity;
             }
         }
     }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Core
@@ -11,25 +10,25 @@ namespace Core
         public static readonly CultureConfiguration Balance = new CultureConfiguration
         {
             Mode = Modes.Balance,
-            GlobalMutationRate = .03,
+            EntityMutationChance = .4,
             InternalMutationRates = new NeuronMutationProbabilities
             {
-                MutationRate = .01,
-                NeuronCreation = .015,
-                NeuronDeletion = .015,
-                SynapseCreation = .25,
-                SynapseDeletion = .25,
-                SynapseAlteration = .6
+                NeuronMutationsPercentage = .05,
+                NeuronCreation = .03,
+                NeuronDeletion = .02,
+                SynapseCreation = .05,
+                SynapseDeletion = .04,
+                SynapseAlteration = .8
             }
         };
 
         public static readonly CultureConfiguration Shrink = new CultureConfiguration
         {
             Mode = Modes.Shrink,
-            GlobalMutationRate = .3,
+            EntityMutationChance = .2,
             InternalMutationRates = new NeuronMutationProbabilities
             {
-                MutationRate = .1,
+                NeuronMutationsPercentage = .1,
                 NeuronCreation = .01,
                 NeuronDeletion = .03,
                 SynapseCreation = .1,
@@ -41,10 +40,10 @@ namespace Core
         public static readonly CultureConfiguration Grow = new CultureConfiguration
         {
             Mode = Modes.Grow,
-            GlobalMutationRate = .1,
+            EntityMutationChance = .2,
             InternalMutationRates = new NeuronMutationProbabilities
             {
-                MutationRate = .05,
+                NeuronMutationsPercentage = .01,
                 NeuronCreation = .03,
                 NeuronDeletion = .01,
                 SynapseCreation = .4,
@@ -54,21 +53,20 @@ namespace Core
         };
 
         public Modes Mode { get; set; }
-        public double GlobalMutationRate { get; set; }
-        public NeuronMutationProbabilities InternalMutationRates { get; set; }
-        public Func<List<double>, List<double>, bool> SuccessFunction { get; set; }
+        public double EntityMutationChance { get; set; } 
+        public NeuronMutationProbabilities InternalMutationRates { get; set; } 
         public int TournamentSize { get; set; } = 5;
-        public double SpeciationFactor = 2; // TODO: needs to be saved 
+        public double SpeciationFactor = 3; // TODO: needs to be saved
+        public int ImprovementDeadline = 30;
 
         public CultureConfiguration() { }
 
         public CultureConfiguration(CultureConfiguration cfg)
         {
             Mode = cfg.Mode;
-            GlobalMutationRate = cfg.GlobalMutationRate;
+            EntityMutationChance = cfg.EntityMutationChance;
             InternalMutationRates = cfg.InternalMutationRates;
             TournamentSize = cfg.TournamentSize;
-            SuccessFunction = cfg.SuccessFunction;
             SpeciationFactor = cfg.SpeciationFactor;
         }
     }
@@ -77,19 +75,21 @@ namespace Core
     {
         public CultureConfiguration Cfg { get; set; }
         public List<Entity> Entities { get; set; }
+        public Agent Agent { get; private set; }
 
         public object SpeciesLock = new object();
-        public Dictionary<Guid, (Entity Original, double SharedFitness, int Count)> SpeciesCatalog { get; set; }
+        public Dictionary<Guid, (Entity Original, double SharedFitness, int Count, int noImprovementCount)> SpeciesCatalog { get; set; }
         public Incubator HostIncubator { get; private set; }
 
         private Task<Entity> overlord;
 
-        public Culture(Incubator incubator, CultureConfiguration _configuration)
+        public Culture(Incubator incubator, Agent agent, CultureConfiguration _configuration)
         {
             Cfg = _configuration;
             HostIncubator = incubator;
             Entities = new List<Entity>();
-            SpeciesCatalog = new Dictionary<Guid, (Entity, double, int)>();
+            SpeciesCatalog = new Dictionary<Guid, (Entity, double, int, int)>();
+            Agent = agent;
         }
 
         private int Tournament()
@@ -101,10 +101,13 @@ namespace Core
             {
                 int index = R.NG.Next(Entities.Count);
                 double sharedFitness = Entities[index].SharedFitness();
+                int noImp = SpeciesCatalog[Entities[index].Species].noImprovementCount;
 
-                if (sharedFitness > bestFitnes
-                || (bestPosition > -1 && Math.Abs(sharedFitness - bestFitnes) < 0.00001 
-                && Entities[bestPosition].Fitness < Entities[index].Fitness))
+                if (noImp < Cfg.ImprovementDeadline
+                && (sharedFitness > bestFitnes 
+                    || (bestPosition > -1 && Math.Abs(sharedFitness - bestFitnes) < 0.00001 
+                        && Entities[bestPosition].Fitness < Entities[index].Fitness))) 
+                // finds a better species or a better entity from the species
                 {
                     bestFitnes = sharedFitness;
                     bestPosition = index;
@@ -114,6 +117,12 @@ namespace Core
             return bestPosition;
         }
 
+        /// <summary>
+        /// Finds a partner thats fitter than mate.
+        /// </summary>
+        /// <param name="mate">The weaker mate</param>
+        /// <param name="mateIndex">Mate position</param>
+        /// <returns>Fitter entity</returns>
         private Entity Tournament(Entity mate, int mateIndex)
         {
             int position = -1;
@@ -137,7 +146,8 @@ namespace Core
 
                 if (position == -1
                 && Entities[index].Fitness > alrightFitness
-                && mate.Compatibility(Entities[index]) < Cfg.SpeciationFactor)
+                && mate.Compatibility(Entities[index]) < Cfg.SpeciationFactor
+                && SpeciesCatalog[Entities[index].Species].noImprovementCount < Cfg.ImprovementDeadline)
                 {
                     alrightFitness = Entities[index].Fitness;
                     alrightPosition = index;
@@ -169,7 +179,7 @@ namespace Core
             if (hunter.Fitness > Entities[0].Fitness) // dethrones the current culture champion
                 return 0;
 
-            if (Entities[parentIndex].ChildCount > 2 
+            if (Entities[parentIndex].ChildCount > 5
             && parentIndex != 0) // parent is old and can be replaced
                 return parentIndex;
 
@@ -179,16 +189,26 @@ namespace Core
 
             for (int i = 0; i < Cfg.TournamentSize; ++i)
             {
-                int index = R.NG.Next(Entities.Count);
-                while (index == parentIndex || index == 0)
-                    index = R.NG.Next(Entities.Count);
+                int index = R.NG.Next(1, Entities.Count);
+                while (index == parentIndex)
+                    index = R.NG.Next(1, Entities.Count);
 
                 var newPrey = Entities[index];
                 double preySharedFitness = newPrey.SharedFitness();
+                int preyNoImp = SpeciesCatalog[newPrey.Species].noImprovementCount;
 
-                if (preySharedFitness < worstFitness // found weaker species
-                || (worstPosition > -1 && Math.Abs(preySharedFitness - worstFitness) < 0.00001 && newPrey.Fitness < Entities[worstPosition].Fitness) // found weaker individual of already found weaker species
-                || (hunter.Species == newPrey.Species && hunter.Fitness > newPrey.Fitness && preySharedFitness <= worstFitness)) // found weaker individual in same species as hunter
+                if (preyNoImp >= Cfg.ImprovementDeadline)
+                {
+                    worstFitness = preySharedFitness;
+                    worstPosition = index;
+                    break;
+                }
+                else if (preySharedFitness < worstFitness // found weaker species
+                || (worstPosition > -1 && Math.Abs(preySharedFitness - worstFitness) < 0.00001 
+                    && newPrey.Fitness < Entities[worstPosition].Fitness) // found weaker individual of species with same weakness
+                || (hunter.Species == newPrey.Species 
+                    && hunter.Fitness > newPrey.Fitness 
+                    && preySharedFitness <= worstFitness)) // found weaker individual in same species as hunter
                 {
                     worstFitness = preySharedFitness;
                     worstPosition = index;
@@ -222,7 +242,7 @@ namespace Core
                 }
                 else
                 {
-                    int index = R.NG.Next(Entities.Count);
+                    int index = R.NG.Next(1, Entities.Count);
 
                     if (Entities[index].SharedFitness() < hunter.SharedFitness())
                         ReplaceEntity(hunter, index);
@@ -234,9 +254,9 @@ namespace Core
         {
             lock (SpeciesLock)
             {
-                var (original, fitness, count) = SpeciesCatalog[Entities[position].Species];
+                var (original, fitness, count, noImp) = SpeciesCatalog[Entities[position].Species];
                 fitness = (fitness * count - Entities[position].Fitness) / (count - 1);
-                SpeciesCatalog[Entities[position].Species] = (original, fitness, count - 1);
+                SpeciesCatalog[Entities[position].Species] = (original, fitness, count - 1, noImp);
 
                 if (SpeciesCatalog[Entities[position].Species].Count <= 0)
                     SpeciesCatalog.Remove(Entities[position].Species);
@@ -245,18 +265,22 @@ namespace Core
 
                 if (SpeciesCatalog.ContainsKey(replacement.Species))
                 {
-                    (original, fitness, count) = SpeciesCatalog[replacement.Species];
+                    (original, fitness, count, noImp) = SpeciesCatalog[replacement.Species];
+                    double oldFitness = fitness;
                     fitness = (fitness * count + replacement.Fitness) / (count + 1);
-                    SpeciesCatalog[replacement.Species] = (original, fitness, count + 1);
+                    // counts the number of times a child spawned without the species improving
+                    if (fitness <= oldFitness) noImp++;
+                    else noImp = 0;
+                    SpeciesCatalog[replacement.Species] = (original, fitness, count + 1, noImp);
                 }
                 else
-                    SpeciesCatalog.Add(replacement.Species, (replacement, replacement.Fitness, 1));
+                    SpeciesCatalog.Add(replacement.Species, (replacement, replacement.Fitness, 1, 0));
             }
         }
 
         public void SpeciateAll()
         {
-            SpeciesCatalog = new Dictionary<Guid, (Entity, double, int)>();
+            SpeciesCatalog = new Dictionary<Guid, (Entity, double, int, int)>();
 
             for (int i = 0; i < Entities.Count; ++i)
             {
@@ -266,9 +290,9 @@ namespace Core
                 {
                     if (Entities[j].Compatibility(Entities[i]) < Cfg.SpeciationFactor)
                     {
-                        var (original, fitness, count) = SpeciesCatalog[Entities[j].Species];
+                        var (original, fitness, count, noImp) = SpeciesCatalog[Entities[j].Species];
                         fitness = (fitness * count + Entities[i].Fitness) / (count + 1);
-                        SpeciesCatalog[Entities[j].Species] = (original, fitness, count + 1);
+                        SpeciesCatalog[Entities[j].Species] = (original, fitness, count + 1, noImp);
                         Entities[i].Species = Entities[j].Species;
                         break;
                     }
@@ -277,21 +301,21 @@ namespace Core
                 if (Entities[i].Species == Guid.Empty)
                 {
                     Entities[i].Species = Guid.NewGuid();
-                    SpeciesCatalog.Add(Entities[i].Species, (Entities[i], Entities[i].Fitness, 1));
+                    SpeciesCatalog.Add(Entities[i].Species, (Entities[i], Entities[i].Fitness, 1, 0));
                 }
             }
         }
 
-        public Task<Entity> EvaluateAll(List<Datum> features, bool cumulative)
+        public Task<Entity> EvaluateAll()
         {
             if (overlord != null && !overlord.IsCompleted)
                 return overlord;
 
-            overlord = Task.Run(() =>
+            overlord = Task.Run(async () =>
             {
                 for (int i = 0; i < Entities.Count; ++i)
                 {
-                    Entities[i].Evaluate(features, cumulative, Cfg.SuccessFunction);
+                    await Entities[i].Evaluate(1, Agent);
 
                     if (Entities[i].Fitness > Entities[0].Fitness)
                     {
@@ -309,12 +333,12 @@ namespace Core
             return overlord;
         }
 
-        public Task<Entity> Develop(List<Datum> features)
+        public Task<Entity> Develop()
         {
             if(overlord != null && !overlord.IsCompleted)
                 return overlord;
 
-            overlord = Task.Run(() =>
+            overlord = Task.Run(async () =>
             {
                 int mateIndex;
 
@@ -328,13 +352,13 @@ namespace Core
 
                 father = Entities[mateIndex];
                 mother = Tournament(father, mateIndex);
-
-                if (mother.Fitness < father.Fitness)
+                if (father.Fitness > mother.Fitness) // mother has to be the fitter parrent
                 {
-                    var t1 = mother;
-                    mother = father;
-                    father = t1;
+                    var temp = father;
+                    father = mother;
+                    mother = temp;
                 }
+                bool asexual = mother.Equals(father);
 
                 var child = mother.Copulate(father, Cfg);
                 child.HostCulture = this;
@@ -343,24 +367,28 @@ namespace Core
                 int genomeQuality = Math.Max(mother.ChildCount, father.ChildCount);
 
                 bool hasMutated = false;
-                p.MutationRate = p.MutationRate * genomeQuality;
+                p.NeuronMutationsPercentage = p.NeuronMutationsPercentage * genomeQuality; // the more children the entities had the higher chance of mutation
 
-                if (mother.Equals(father))
+                if (asexual) // always mutate if asexual conception 
                     hasMutated = child.Mutate(p, 1);
                 else
-                    hasMutated = child.Mutate(p, Cfg.GlobalMutationRate * genomeQuality);
+                    hasMutated = child.Mutate(p, Cfg.EntityMutationChance * genomeQuality);
 
-                child.Evaluate(features, false, Cfg.SuccessFunction);
+                await child.Evaluate(3, Agent);
 
-                child.Speciate(mother);
-
-                if (!hasMutated && mother.Species == father.Species)
+                if (mother.Species == father.Species && !hasMutated)
                 {
-                    while (child.Species != mother.Species)
-                    {
-                        Cfg.SpeciationFactor += 0.3;
-                        child.Speciate(mother);
-                    }
+                    child.Species = mother.Species;
+                }
+                else
+                {
+                    child.Speciate(mother);
+
+                    //for (int i = 0; i < 3 && (child.Species != mother.Species && asexual); ++i)
+                    //{
+                    //    Cfg.SpeciationFactor += 0.3;
+                    //    child.Speciate(mother);
+                    //}
                 }
 
                 int prey;
